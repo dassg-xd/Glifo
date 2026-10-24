@@ -87,20 +87,3 @@ TrazoHMM/
 ├── models/                   # Modelos entrenados (.json)
 └── data/                     # Trazos de ejemplo por letra
 ```
-
-> La interfaz **no entrena**: solo carga los modelos ya entrenados desde `models/`.
-
----
-
-## Instalación y uso
-
-```bash
-git clone https://github.com/<usuario>/TrazoHMM.git
-cd TrazoHMM
-pip install -r requirements.txt
-
-python training/train_all.py   # (opcional) reentrenar modelos
-python main.py                 # abrir la aplicación
-```
-
----
