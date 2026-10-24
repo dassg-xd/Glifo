@@ -1,4 +1,4 @@
-# Gkifo
+# Glifo
 
 **Reconocedor de letras manuscritas en tiempo real (2D y 3D) con Cadenas Ocultas de Markov.**
 
