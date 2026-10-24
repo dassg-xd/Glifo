@@ -21,7 +21,7 @@ Funciona en dos modos: sobre un **plano 2D** y sobre una **esfera 3D**.
 
 Una letra se dibuja como una secuencia de movimientos: "abajo, abajo, derecha, arriba...". Cada letra tiene su propio patrón.
 
-- **Lo que vemos (observaciones):** la dirección del trazo en cada instante (↑ ↗ → ↘ ...).
+- **Lo que vemos (observaciones):** la dirección del trazo en cada instante.
 - **Lo que no vemos (estados ocultos):** en qué parte de la letra va el usuario (inicio, curva, cierre...).
 
 Un **HMM** modela justamente eso. Entrenamos **uno por letra** y vemos cuál explica mejor el trazo actual.
