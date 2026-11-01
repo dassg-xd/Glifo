@@ -1,0 +1,10 @@
+# Normaliza los finales de línea a LF en el repositorio (evita diffs ruidosos
+# entre quienes trabajan en Windows y quienes no).
+* text=auto eol=lf
+
+# Archivos binarios: que git no los toque.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
