@@ -21,7 +21,7 @@ from src.FeatureExtractor import ALPHABET, FeatureExtractor  # noqa: E402
 
 
 def trazo_px(p0, p1, n=40, t0=0):
-    """Trazo recto en píxeles con formato [x, y, t_ms]."""
+    """Trazo recto en la escala 0–1000 de Glifo Capture, con formato [x, y, t_ms]."""
     return [[p0[0] + (p1[0] - p0[0]) * i / n, p0[1] + (p1[1] - p0[1]) * i / n, t0 + 7 * i] for i in range(n + 1)]
 
 

@@ -29,8 +29,9 @@ Cómo se eligieron: se compararon K ∈ {8, 16} y pasos de 0.02 a 0.05 con un cl
 ## 3. Qué debe entregar la GUI
 
 - Lista de puntos `(x, y)` **normalizados**: `x / L`, `y / L`, con `L` = lado del lienzo (lienzo **cuadrado**; si no lo es, dividir ambos ejes por el mismo `L`). El eje Y es el de pantalla.
-- Los trazos del dataset se normalizaron con `L = 1000 px` (`--canvas`). **Pendiente de confirmar** que ese era el lado del lienzo de grabación; si no lo era, se regeneran las secuencias con `--canvas <valor real>`.
-- Lo que importa es la escala **relativa**: una letra típica ocupa ≈ 0.28 del lienzo (rango 0.17–0.47). Si el lienzo de la GUI es mucho más pequeño o las letras se dibujan mucho más chicas, las secuencias saldrán más cortas que las de entrenamiento.
+- **Escala del dataset:** Glifo Capture guarda las coordenadas en una escala de **0 a 1000 relativa al lienzo de captura** (500 es siempre la mitad, en cualquier pantalla; **no son píxeles**). Dividir entre `canvas = 1000` deja los puntos en [0, 1], exactamente la misma escala relativa que debe producir la GUI.
+- Lo que importa es la escala **relativa**: una letra típica ocupa ≈ 0.28 del lienzo (rango 0.17–0.47). Si las letras se dibujan mucho más chicas o más grandes que en el dataset, las secuencias saldrán más cortas o más largas que las de entrenamiento.
+- **Caso crítico: «i» y «l».** La «i» mide en promedio ≈ 0.16 del lienzo y la «l» ≈ 0.38; su palito da unos 4 símbolos (el punto no aporta) frente a unos 12 de la «l», así que se distinguen sobre todo por el **largo**, que depende de la escala. La GUI debe respetar las mismas proporciones que Glifo Capture (líneas guía: ascendente 0.18, altura x 0.42, línea base 0.70, descendente 0.90).
 - Varios trazos: `FeatureExtractor.join_strokes([trazo1, trazo2, ...])`.
 
 ## 4. API
@@ -66,12 +67,12 @@ Notas:
 
 ## 6. Datos
 
-**Entrada** (la genera el recolector del equipo): `data/glifo-dataset-AAAA-MM-DD.json`
+**Entrada** (la genera Glifo Capture): `data/glifo-dataset-AAAA-MM-DD.json`
 
 ```json
 { "a": [ [ [ [481.7, 511.8, 0], [472.9, 505.9, 12] ], [ ...otro trazo... ] ], ... ], "b": [ ... ] }
 ```
-`letra → muestras → trazos → [x_px, y_px, t_ms]`. El tiempo se descarta.
+`letra → muestras → trazos → [x, y, t_ms]`, con `x`, `y` en la escala **0–1000 relativa al lienzo de captura** (no píxeles). El tiempo se descarta.
 
 **Salida** de `python training/build_sequences.py` → `data/secuencias_2d_k8.json`:
 
@@ -83,6 +84,8 @@ Notas:
 ```
 
 - `secuencias` es el conjunto de **entrenamiento** y `prueba` el de **evaluación** (20 % por letra, reproducible con la semilla). Con `--holdout 0` todo va a entrenamiento (para el modelo final).
+- Es un archivo **generado**: regenerarlo cada vez que cambie el dataset, K, el paso o el suavizado.
+- El reparto es aleatorio porque el dataset estándar no trae autor; con la descarga "con detalles" de Glifo Capture se podrá separar por persona (segunda entrega).
 - El modelo exportado por el HMMEngine debería guardar `k`, `paso` y el número de estados para detectar desajustes con la GUI.
 
 ## 7. Comandos útiles

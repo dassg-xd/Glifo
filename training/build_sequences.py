@@ -16,6 +16,9 @@ Salida: data/secuencias_2d_k<K>.json
       "prueba":     { "a": [[...], ...], ... }               # EVALUACIÓN (vacío si --holdout 0)
     }
 
+Este archivo es GENERADO: hay que volver a crearlo cada vez que cambie el dataset
+(o K, el paso o el suavizado); si no, queda desactualizado sin que nadie lo note.
+
 La partición es por letra y reproducible (misma semilla -> mismo reparto). El
 JSON no dice quién dibujó cada muestra, así que el reparto es aleatorio: la
 precisión sobre "prueba" puede ser algo optimista porque trazos de la misma
@@ -77,7 +80,8 @@ def main() -> int:
     ap.add_argument("--k", type=int, default=DEFAULT_K, choices=VALID_K, help="sectores angulares")
     ap.add_argument("--step", type=float, default=DEFAULT_STEP, help="paso de remuestreo (fracción del lienzo)")
     ap.add_argument("--smooth", type=int, default=DEFAULT_SMOOTH_PASSES, help="pasadas de suavizado")
-    ap.add_argument("--canvas", type=float, default=DEFAULT_CANVAS, help="lado del lienzo de grabación en px")
+    ap.add_argument("--canvas", type=float, default=DEFAULT_CANVAS,
+                    help="escala de las coordenadas del dataset (Glifo Capture usa 0–1000, relativa al lienzo)")
     ap.add_argument("--holdout", type=float, default=0.2, help="fracción para prueba por letra (0 = todo a entrenamiento)")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--min-symbols", type=int, default=4, help="descarta trazos con menos símbolos")
@@ -92,7 +96,7 @@ def main() -> int:
     secuencias, descartadas = to_sequences(datos, fx, args.min_symbols)
     train, test = split_holdout(secuencias, args.holdout, args.seed)
 
-    print(f"Dataset: {ruta.name} · K={args.k} · paso={args.step} · suavizado={args.smooth} · lienzo={args.canvas:g}px")
+    print(f"Dataset: {ruta.name} · K={args.k} · paso={args.step} · suavizado={args.smooth} · escala 0–{args.canvas:g}")
     print(f"{'letra':<6}{'train':>6}{'prueba':>7}{'media':>7}{'min':>5}{'max':>5}")
     sin_datos = []
     for l in ALPHABET:

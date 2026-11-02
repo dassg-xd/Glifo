@@ -7,7 +7,9 @@ lienzo (señal de que `--canvas` no coincide con el lienzo de grabación).
 
 Uso (desde la raíz del proyecto):
     python training/check_data.py --dataset data/glifo-dataset-2026-11-01.json
-    python training/check_data.py --meta 40        # exige 40 muestras por letra
+    python training/check_data.py --meta 50        # exige 50 muestras por letra
+
+La meta por defecto es la del recolector (Glifo Capture): 70 muestras por letra.
 """
 from __future__ import annotations
 
@@ -35,10 +37,11 @@ from src.FeatureExtractor import (  # noqa: E402
 def main() -> int:
     ap = argparse.ArgumentParser(description="Revisión de calidad del dataset")
     ap.add_argument("--dataset", default=None)
-    ap.add_argument("--canvas", type=float, default=DEFAULT_CANVAS)
+    ap.add_argument("--canvas", type=float, default=DEFAULT_CANVAS,
+                    help="escala de las coordenadas del dataset (Glifo Capture usa 0–1000)")
     ap.add_argument("--k", type=int, default=DEFAULT_K, choices=VALID_K)
     ap.add_argument("--step", type=float, default=DEFAULT_STEP)
-    ap.add_argument("--meta", type=int, default=30, help="mínimo de muestras por letra")
+    ap.add_argument("--meta", type=int, default=70, help="mínimo de muestras por letra (meta de Glifo Capture)")
     ap.add_argument("--min-symbols", type=int, default=4)
     args = ap.parse_args()
 
@@ -46,7 +49,7 @@ def main() -> int:
     datos = load_dataset(ruta, args.canvas)
     fx = FeatureExtractor(k=args.k, step=args.step, smooth_passes=DEFAULT_SMOOTH_PASSES)
 
-    print(f"Dataset: {ruta.name} · lienzo={args.canvas:g}px · K={args.k} · paso={args.step}\n")
+    print(f"Dataset: {ruta.name} · escala 0–{args.canvas:g} · K={args.k} · paso={args.step}\n")
     print(f"{'letra':<6}{'n':>4}{'trazos':>8}{'símb.med':>10}{'min':>5}{'max':>5}  avisos")
 
     problemas = []
@@ -80,7 +83,7 @@ def main() -> int:
     total = sum(len(datos.get(l, [])) for l in ALPHABET)
     print(f"\nTotal: {total} muestras · letras con avisos: {len(problemas)}")
     if fuera:
-        print(f"⚠ {fuera} puntos caen fuera del lienzo [0, 1]: revisa --canvas (¿cuál es el lado real del lienzo?).")
+        print(f"⚠ {fuera} puntos caen fuera de [0, 1]: revisa --canvas (la escala de Glifo Capture es 0–1000).")
     return 0
 
 
