@@ -115,7 +115,7 @@ python -m unittest discover -s tests -v
 python training/check_data.py
 ```
 
-Muestra cuántas muestras hay por letra, cuántos símbolos genera cada una y avisa de trazos demasiado cortos, de longitud atípica o fuera del lienzo.
+Muestra cuántas muestras hay por letra (la meta de Glifo Capture es 70; se cambia con `--meta`), cuántos símbolos genera cada una y avisa de trazos demasiado cortos, de longitud atípica o fuera de la escala esperada.
 
 ### Generar las secuencias de entrenamiento
 
@@ -124,7 +124,9 @@ python training/build_sequences.py                 # K=8, 20 % para prueba
 python training/build_sequences.py --holdout 0     # todo a entrenamiento (modelo final)
 ```
 
-Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.json`, que consume el entrenamiento del HMM. Cada muestra del dataset es `letra → muestras → trazos → [x_px, y_px, t_ms]`.
+Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.json`, que consume el entrenamiento del HMM. Cada muestra del dataset es `letra → muestras → trazos → [x, y, t_ms]`, con `x`, `y` en la escala 0–1000 relativa al lienzo de Glifo Capture (no son píxeles).
+
+> **Regenerar con `python training/build_sequences.py` cada vez que cambie el dataset.** `secuencias_2d_k8.json` es un archivo generado: si el dataset cambia y no se vuelve a crear, queda desactualizado sin que nadie lo note.
 
 ---
 
@@ -149,7 +151,7 @@ TrazoHMM/
 ├── models/                       # (pendiente) Modelos entrenados (.json)
 ├── data/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
-│   └── secuencias_2d_k8.json     # Secuencias generadas
+│   └── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
 ├── requirements.txt
 ├── .gitattributes                # Finales de línea LF
 └── .gitignore
