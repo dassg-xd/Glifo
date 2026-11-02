@@ -8,7 +8,7 @@ Formato de entrada (el que genera el recolector del equipo):
     {
       "a": [                                  # letra
         [                                     # muestra
-          [ [481.7, 511.8, 0], [472.9, 505.9, 12], ... ],   # trazo: [x_px, y_px, t_ms]
+          [ [481.7, 511.8, 0], [472.9, 505.9, 12], ... ],   # trazo: [x, y, t_ms]
           [ ... ]                                           # (otro trazo si levantó el lápiz)
         ],
         ...
@@ -16,10 +16,12 @@ Formato de entrada (el que genera el recolector del equipo):
       "b": [ ... ], ...
     }
 
-Las coordenadas están en píxeles (Y crece hacia abajo). Aquí se NORMALIZAN
-dividiendo entre el lado del lienzo (`canvas`), que es lo que también debe hacer
-la GUI antes de llamar al FeatureExtractor. El tiempo `t` se descarta: el
-remuestreo es por longitud de arco, no por tiempo.
+Las coordenadas NO son píxeles: Glifo Capture las guarda en una escala de 0 a
+1000 relativa al lienzo de captura, igual en cualquier pantalla (500 es siempre
+la mitad del lienzo). Y crece hacia abajo. Aquí se NORMALIZAN dividiendo entre
+1000 (`canvas`) para quedar en [0, 1]; la GUI debe entregar al FeatureExtractor
+puntos en esa misma escala relativa (x/L, y/L con L = lado de su lienzo).
+El tiempo `t` se descarta: el remuestreo es por longitud de arco, no por tiempo.
 """
 from __future__ import annotations
 
@@ -34,7 +36,7 @@ if str(ROOT) not in sys.path:
 
 from src.FeatureExtractor import ALPHABET  # noqa: E402
 
-DEFAULT_CANVAS = 1000.0   # lado de referencia del lienzo, en píxeles (ajustable)
+DEFAULT_CANVAS = 1000.0   # escala de Glifo Capture: coordenadas 0–1000 relativas al lienzo (no son píxeles)
 
 
 def find_dataset(data_dir: Path = ROOT / "data") -> Path:
