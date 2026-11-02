@@ -4,6 +4,8 @@
 
 Proyecto Final · Procesos Estocásticos (603504) · Universidad de los Llanos · Ingeniería de Sistemas
 
+> **Estado:** la primera entrega cubre el modo **2D**. El modo 3D (esfera) llega en la segunda entrega.
+
 ---
 
 ## ¿Qué hace?
@@ -15,9 +17,10 @@ Dibujas una letra con el ratón y la aplicación:
 3. **Autocompleta** el trazo con una línea punteada que predice cómo seguiría la letra.
 
 Funciona en dos modos: sobre un **plano 2D** y sobre una **esfera 3D**.
+
 ---
 
-##
+## La idea: ¿por qué un HMM?
 
 Una letra se dibuja como una secuencia de movimientos: "abajo, abajo, derecha, arriba...". Cada letra tiene su propio patrón.
 
@@ -39,8 +42,13 @@ flowchart LR
 ## Cómo funciona
 
 ### 1. Convertir el trazo en símbolos
-Cada paso del cursor se convierte en una de **8 o 16 direcciones** (Chain Code).
-En 3D, los puntos de la esfera se pasan a ángulos (θ, φ) y se hace lo mismo con sus variaciones.
+Cada tramo del trazo se convierte en una de **8 direcciones** (Chain Code, K = 8):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| → | ↗ | ↑ | ↖ | ← | ↙ | ↓ | ↘ |
+
+Antes de cuantizar, el trazo se suaviza y se remuestrea por **longitud de arco** (un punto cada 3 % del lienzo), de modo que la velocidad con la que se dibuja no cambia la secuencia. Detalles en [`docs/contrato_features.md`](docs/contrato_features.md).
 
 ### 2. Un modelo HMM por letra
 Cada modelo está definido por λ = (A, B, π):
@@ -74,16 +82,75 @@ Cada ventana tiene el **lienzo a la izquierda** y el **ranking de letras a la de
 
 ---
 
+## Requisitos
+
+| Qué | Detalle |
+|---|---|
+| **Python** | 3.9 o superior (probado con 3.13) |
+| **Extractor, datos y pruebas** | Solo usan la librería estándar de Python |
+| **HMMEngine** | Usa NumPy (ver `requirements.txt`) |
+| **GUI** | Según la tecnología que elija el equipo (p. ej. Tkinter, que viene con Python; en Linux: `sudo apt install python3-tk`) |
+
+```bash
+pip install -r requirements.txt
+```
+
+> En Windows, si `python` no responde, usa `py` en su lugar.
+
+---
+
+## Cómo ejecutar
+
+Todos los comandos se lanzan **desde la raíz del proyecto**.
+
+### Pruebas
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+### Revisar el dataset
+
+```bash
+python training/check_data.py
+```
+
+Muestra cuántas muestras hay por letra, cuántos símbolos genera cada una y avisa de trazos demasiado cortos, de longitud atípica o fuera del lienzo.
+
+### Generar las secuencias de entrenamiento
+
+```bash
+python training/build_sequences.py                 # K=8, 20 % para prueba
+python training/build_sequences.py --holdout 0     # todo a entrenamiento (modelo final)
+```
+
+Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.json`, que consume el entrenamiento del HMM. Cada muestra del dataset es `letra → muestras → trazos → [x_px, y_px, t_ms]`.
+
+---
+
 ## Estructura del proyecto
 
 ```
 TrazoHMM/
-├── main.py
+├── main.py                       # (pendiente)
 ├── src/
-│   ├── HMMEngine.py          # Forward, Viterbi, Baum-Welch, proyección
-│   ├── FeatureExtractor.py   # Chain Code y coordenadas esféricas
-│   └── GUI.py                # Ventanas e interacción
-├── training/                 # Scripts de entrenamiento offline
-├── models/                   # Modelos entrenados (.json)
-└── data/                     # Trazos de ejemplo por letra
+│   ├── FeatureExtractor.py       # Chain Code, remuestreo, símbolos <-> puntos
+│   ├── HMMEngine.py              # (pendiente) Forward, Viterbi, Baum-Welch, proyección
+│   └── GUI.py                    # (pendiente) Ventanas e interacción
+├── training/
+│   ├── dataset.py                # Lector del JSON del dataset
+│   ├── check_data.py             # Revisión de calidad de los datos
+│   └── build_sequences.py        # Dataset -> secuencias de símbolos
+├── tests/
+│   ├── test_features.py          # Pruebas del extractor
+│   └── test_dataset.py           # Pruebas del lector y de build_sequences
+├── docs/
+│   └── contrato_features.md      # Contrato entre módulos
+├── models/                       # (pendiente) Modelos entrenados (.json)
+├── data/
+│   ├── glifo-dataset-*.json      # Trazos de ejemplo
+│   └── secuencias_2d_k8.json     # Secuencias generadas
+├── requirements.txt
+├── .gitattributes                # Finales de línea LF
+└── .gitignore
 ```
