@@ -9,20 +9,41 @@ class HMMEngine:
     # ---------------------------------------------------------
     # 1. MATEMÁTICAS CORE (Algoritmos base)
     # ---------------------------------------------------------
-    def _inicializar_hmm(self, N, M):
-        """Inicializa pi, A, B con topología estricta Left-to-Right"""
+    def _inicializar_hmm(self, N, M, secuencias=None, piso=1e-3):
+        """Inicializa pi, A, B con topología estricta Left-to-Right.
+
+        Sin `secuencias`, B arranca al azar. Con `secuencias` se usa la
+        inicialización por tramos, la habitual en modelos izquierda-derecha:
+        cada secuencia se parte en N tramos iguales, el tramo i se asigna al
+        estado i y B arranca con la frecuencia de cada símbolo en su tramo
+        (más un piso para que ninguna emisión empiece en 0). La
+        autotransición a_ii se elige para que la duración media de cada
+        estado, 1/(1 - a_ii), sea el largo medio de un tramo (T_medio / N).
+        """
         pi = np.zeros(N)
         pi[0] = 1.0
 
+        if secuencias:
+            largo_medio = np.mean([len(O) for O in secuencias])
+            a_ii = min(0.95, max(0.5, 1.0 - N / largo_medio))
+        else:
+            a_ii = 0.5
         A = np.zeros((N, N))
         for i in range(N):
             if i == N - 1:
-                A[i, i] = 1.0 
+                A[i, i] = 1.0
             else:
-                A[i, i] = 0.5
-                A[i, i+1] = 0.5
+                A[i, i] = a_ii
+                A[i, i+1] = 1.0 - a_ii
 
-        B = np.random.rand(N, M)
+        if secuencias:
+            B = np.full((N, M), piso)
+            for O in secuencias:
+                for estado, tramo in enumerate(np.array_split(np.asarray(O, dtype=int), N)):
+                    for k in tramo:
+                        B[estado, k] += 1.0
+        else:
+            B = np.random.rand(N, M)
         B = B / np.sum(B, axis=1, keepdims=True)
 
         return pi, A, B
@@ -83,8 +104,13 @@ class HMMEngine:
 
         return delta, psi, ruta_optima
 
-    def iteracion_baum_welch_offline(self, pi, A, B, secuencias, N, M):
-        """Lógica de entrenamiento por lotes con escalado."""
+    def iteracion_baum_welch_offline(self, pi, A, B, secuencias, N, M, piso=0.0):
+        """Lógica de entrenamiento por lotes con escalado.
+
+        `piso` > 0 impide que una emisión b_i(k) quede exactamente en 0: si
+        quedara en 0, un solo símbolo no visto en el entrenamiento anularía
+        P(O | λ) y descartaría la letra aunque el resto del trazo encaje.
+        """
         pi_num = np.zeros(N)
         A_num = np.zeros((N, N))
         A_den = np.zeros(N)
@@ -146,26 +172,37 @@ class HMMEngine:
             A_new[i, i+2:] = 0.0
         A_new = A_new / np.sum(A_new, axis=1, keepdims=True)
 
+        if piso > 0:
+            B_new = np.maximum(B_new, piso)
+            B_new = B_new / np.sum(B_new, axis=1, keepdims=True)
+
         return pi_new, A_new, B_new
 
     # ---------------------------------------------------------
     # 2. ENTRENAMIENTO E I/O (Entrada/Salida)
     # ---------------------------------------------------------
-    def entrenar_modelos(self, ruta_json_secuencias, estados_por_letra, M=8, epocas=5):
-        """Llama a inicializar_hmm y baum_welch, y guarda el resultado en self.modelos"""
+    def entrenar_modelos(self, ruta_json_secuencias, estados_por_letra, M=8, epocas=5,
+                         semilla=0, piso_emision=1e-3, init_por_tramos=True):
+        """Llama a inicializar_hmm y baum_welch, y guarda el resultado en self.modelos.
+
+        `semilla` fija el azar para que entrenar dos veces dé los mismos modelos.
+        `piso_emision` es el mínimo de cada b_i(k) en cada iteración.
+        `init_por_tramos` usa la inicialización por tramos en lugar de B al azar.
+        """
+        np.random.seed(semilla)
         with open(ruta_json_secuencias, 'r', encoding='utf-8') as f:
             datos = json.load(f)
-        
+
         secuencias_por_letra = datos.get('secuencias', {})
 
         for letra, secuencias in secuencias_por_letra.items():
-            N = estados_por_letra.get(letra, 4) 
-            pi, A, B = self._inicializar_hmm(N, M)
-            
+            N = estados_por_letra.get(letra, 4)
+            pi, A, B = self._inicializar_hmm(N, M, secuencias if init_por_tramos else None, piso_emision)
+
             print(f"Entrenando letra '{letra}' ({N} estados) - {len(secuencias)} secuencias...")
-            
+
             for epoca in range(epocas):
-                pi, A, B = self.iteracion_baum_welch_offline(pi, A, B, secuencias, N, M)
+                pi, A, B = self.iteracion_baum_welch_offline(pi, A, B, secuencias, N, M, piso_emision)
             
             self.modelos[letra] = {
                 'N': N,
