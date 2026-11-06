@@ -104,6 +104,32 @@ class HMMEngine:
 
         return delta, psi, ruta_optima
 
+    def viterbi_log(self, pi, A, B, O, terminar_en_final=False):
+        """Viterbi en logaritmos: δ_t(j) = max_i [δ_{t-1}(i) + log a_ij] + log b_j(O_t).
+
+        Mismo algoritmo que `algoritmo_viterbi`, pero sumando logaritmos en vez
+        de multiplicar probabilidades, así que no se vuelve 0 con trazos largos.
+        Con `terminar_en_final=True` la ruta debe acabar en el último estado.
+        Devuelve (ruta óptima de estados, log P de esa ruta).
+        """
+        O = np.asarray(O, dtype=int)
+        T, N = len(O), A.shape[0]
+        with np.errstate(divide="ignore"):
+            lpi, lA, lB = np.log(pi), np.log(A), np.log(B)
+        delta = np.full((T, N), -np.inf)
+        psi = np.zeros((T, N), dtype=int)
+        delta[0] = lpi + lB[:, O[0]]
+        for t in range(1, T):
+            candidatos = delta[t - 1][:, None] + lA        # candidatos[i, j]
+            psi[t] = np.argmax(candidatos, axis=0)
+            delta[t] = candidatos[psi[t], np.arange(N)] + lB[:, O[t]]
+        final = N - 1 if terminar_en_final else int(np.argmax(delta[T - 1]))
+        ruta = np.zeros(T, dtype=int)
+        ruta[T - 1] = final
+        for t in range(T - 2, -1, -1):
+            ruta[t] = psi[t + 1, ruta[t + 1]]
+        return ruta, float(delta[T - 1, final])
+
     def iteracion_baum_welch_offline(self, pi, A, B, secuencias, N, M, piso=0.0):
         """Lógica de entrenamiento por lotes con escalado.
 
