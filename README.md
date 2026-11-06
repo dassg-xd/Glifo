@@ -80,6 +80,18 @@ flowchart LR
 
 Cada ventana tiene el **lienzo a la izquierda** y el **ranking de letras a la derecha**, con botones para limpiar y reiniciar.
 
+En esta entrega **solo funciona el modo 2D**. El botón «Esfera 3D» abre una vista vacía, con la barra superior para volver.
+
+La ventana 2D tiene:
+
+- **Lienzo** con las cuatro líneas guía (ascendente, altura x, línea base y descendente), en las mismas proporciones que Glifo Capture.
+- **Proyección punteada** de la letra más probable, que se actualiza con cada símbolo nuevo.
+- **Ranking** de P(c | O₁:ₜ): las 4 letras más probables y el resto agrupado.
+- **«Trazo no definido»** cuando el trazo no se parece a ninguna letra. En ese caso no se dibuja proyección.
+- **«Guía de letras»**: muestra cómo se dibuja cada letra y en cuántos trazos, según el dataset.
+
+Atajo: `Esc` vuelve al menú.
+
 ---
 
 ## Requisitos
@@ -89,7 +101,7 @@ Cada ventana tiene el **lienzo a la izquierda** y el **ranking de letras a la de
 | **Python** | 3.9 o superior (probado con 3.13) |
 | **Extractor, datos y pruebas** | Solo usan la librería estándar de Python |
 | **HMMEngine** | Usa NumPy (ver `requirements.txt`) |
-| **GUI** | Según la tecnología que elija el equipo (p. ej. Tkinter, que viene con Python; en Linux: `sudo apt install python3-tk`) |
+| **GUI** | PySide6 (Qt 6). Las fuentes van incluidas en `assets/fonts` |
 
 ```bash
 pip install -r requirements.txt
@@ -102,6 +114,22 @@ pip install -r requirements.txt
 ## Cómo ejecutar
 
 Todos los comandos se lanzan **desde la raíz del proyecto**.
+
+### La aplicación
+
+```bash
+python GUI.py
+```
+
+Al abrir el modo 2D se cargan los modelos de `data/modelos_letras_entrenados.json`.
+
+### Entrenar los modelos HMM
+
+```bash
+python training/entrenar_hmms.py
+```
+
+Entrena con Baum-Welch los 27 modelos a partir de `data/secuencias_2d_k8.json` y los guarda en `data/modelos_letras_entrenados.json`.
 
 ### Pruebas
 
@@ -133,25 +161,38 @@ Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.j
 ## Estructura del proyecto
 
 ```
-TrazoHMM/
-├── main.py                       # (pendiente)
+Glifo/
+├── GUI.py                        # Punto de entrada: python GUI.py
 ├── src/
 │   ├── FeatureExtractor.py       # Chain Code, remuestreo, símbolos <-> puntos
-│   ├── HMMEngine.py              # (pendiente) Forward, Viterbi, Baum-Welch, proyección
-│   └── GUI.py                    # (pendiente) Ventanas e interacción
+│   ├── HMMEngine.py              # Forward, Backward, Baum-Welch, Viterbi, clasificación y proyección
+│   └── gui/                      # Interfaz (PySide6)
+│       ├── main_window.py        # Secciones: menú, 2D y 3D
+│       ├── menu_view.py          # Ventana A: menú principal
+│       ├── view_2d.py            # Ventana B: reconocedor 2D
+│       ├── view_3d.py            # Ventana C: 3D (vacía en esta entrega)
+│       ├── canvas_2d.py          # Lienzo con líneas guía y proyección
+│       ├── ranking_panel.py      # Listado de probabilidades
+│       ├── guide_popup.py        # Guía de letras
+│       ├── recognizer.py         # Puente FeatureExtractor + HMMEngine
+│       ├── widgets.py            # Componentes visuales compartidos
+│       └── theme.py              # Colores, fuentes y estilos
 ├── training/
 │   ├── dataset.py                # Lector del JSON del dataset
 │   ├── check_data.py             # Revisión de calidad de los datos
-│   └── build_sequences.py        # Dataset -> secuencias de símbolos
+│   ├── build_sequences.py        # Dataset -> secuencias de símbolos
+│   └── entrenar_hmms.py          # Entrena y exporta los 27 modelos HMM
 ├── tests/
 │   ├── test_features.py          # Pruebas del extractor
-│   └── test_dataset.py           # Pruebas del lector y de build_sequences
+│   ├── test_dataset.py           # Pruebas del lector y de build_sequences
+│   └── test_recognizer.py        # Pruebas del puente GUI <-> HMM
 ├── docs/
 │   └── contrato_features.md      # Contrato entre módulos
-├── models/                       # (pendiente) Modelos entrenados (.json)
+├── assets/fonts/                 # Selawik, Playwrite AR (a y q) e Inconsolata (OFL)
 ├── data/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
-│   └── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
+│   ├── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
+│   └── modelos_letras_entrenados.json  # Modelos HMM que carga la GUI
 ├── requirements.txt
 ├── .gitattributes                # Finales de línea LF
 └── .gitignore
