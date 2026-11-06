@@ -30,7 +30,7 @@ class Lienzo2D(QWidget):
         self.setMouseTracking(False)
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.trazos: list[list[tuple[float, float]]] = []
-        self.proyeccion: list[tuple[float, float]] = []
+        self.proyeccion: list[list[tuple[float, float]]] = []   # tramos; el lápiz se levanta entre uno y otro
         self.no_definido = False
         self._dibujando = False
 
@@ -67,6 +67,11 @@ class Lienzo2D(QWidget):
     def vacio(self) -> bool:
         return not any(self.trazos)
 
+    @property
+    def dibujando(self) -> bool:
+        """True mientras el botón del ratón (o el dedo) sigue abajo."""
+        return self._dibujando
+
     # -------------------------------------------------------------- eventos
     def mousePressEvent(self, ev):
         if ev.button() != Qt.MouseButton.LeftButton or not self.cuadro().contains(ev.position()):
@@ -90,6 +95,7 @@ class Lienzo2D(QWidget):
         if ev.button() == Qt.MouseButton.LeftButton and self._dibujando:
             self._dibujando = False
             self.update()
+            self.trazos_cambiaron.emit()   # al levantar el lápiz se evalúa como letra terminada
 
     # -------------------------------------------------------------- dibujo
     def paintEvent(self, _):
@@ -183,10 +189,12 @@ class Lienzo2D(QWidget):
         pluma.setStyle(Qt.PenStyle.CustomDashLine)
         pluma.setDashPattern([0.01, 2.8])
         p.setPen(pluma)
-        camino = QPainterPath(self._a_pantalla(self.proyeccion[0]))
-        for q in self.proyeccion[1:]:
-            camino.lineTo(self._a_pantalla(q))
-        p.drawPath(camino)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        for tramo in self.proyeccion:
+            camino = QPainterPath(self._a_pantalla(tramo[0]))
+            for q in tramo[1:]:
+                camino.lineTo(self._a_pantalla(q))
+            p.drawPath(camino)
 
     def _dibujar_cursor(self, p: QPainter):
         if not self._dibujando and not self.proyeccion:

@@ -144,7 +144,7 @@ class Vista2D(QWidget):
 
     # ------------------------------------------------------ reconocimiento
     def actualizar(self):
-        r = self.reconocedor.procesar(self.lienzo.trazos)
+        r = self.reconocedor.procesar(self.lienzo.trazos, dibujando=self.lienzo.dibujando)
         hay_trazo = r.estado != "vacio"
         self.boton_limpiar.setEnabled(hay_trazo)
         self.boton_reiniciar.setEnabled(hay_trazo)

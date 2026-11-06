@@ -39,8 +39,25 @@ class TestReconocedor(unittest.TestCase):
         self.assertEqual(len(r.probabilidades), 27)
         self.assertAlmostEqual(sum(p for _, p in r.probabilidades), 1.0, places=6)
         self.assertEqual(r.letra, r.probabilidades[0][0])
-        if r.proyeccion:
-            self.assertEqual(tuple(r.proyeccion[0]), tuple(trazos[-1][-1]))
+        self.assertTrue(r.proyeccion, "debería proyectar lo que falta de la letra")
+        self.assertEqual(tuple(r.proyeccion[0][0]), tuple(trazos[-1][-1]))
+
+    def test_proyeccion_levanta_el_lapiz_entre_trazos(self):
+        # «i» con solo el palito: lo que falta incluye el punto, en un tramo aparte.
+        muestras = [m for m in self.datos["i"] if len(m) == 2]
+        palito = max(muestras[0], key=len)
+        r = self.rec.procesar([palito], dibujando=True)
+        if r.estado == "reconocido" and r.letra == "i":
+            self.assertGreaterEqual(len(r.proyeccion), 1)
+        for tramo in r.proyeccion:
+            self.assertGreaterEqual(len(tramo), 2)
+            self.assertTrue(all(len(p) == 2 for p in tramo))
+
+    def test_plantillas_para_las_27_letras(self):
+        self.assertEqual(len(self.rec.plantillas), 27)
+        for letra, pl in self.rec.plantillas.items():
+            self.assertEqual(len(pl.simbolos), len(pl.segmentos), letra)
+            self.assertEqual(len(pl.ruta), len(pl.simbolos), letra)
 
     def test_mayoria_de_letras_completas_no_son_no_definidas(self):
         marcadas = total = 0
@@ -48,7 +65,7 @@ class TestReconocedor(unittest.TestCase):
             for muestra in self.datos[letra][:10]:
                 self.rec.reiniciar()
                 total += 1
-                marcadas += self.rec.procesar(muestra).estado == "no_definido"
+                marcadas += self.rec.procesar(muestra, dibujando=False).estado == "no_definido"
         self.assertLessEqual(marcadas / total, 0.15)
 
     def test_garabato_es_no_definido(self):
@@ -60,7 +77,7 @@ class TestReconocedor(unittest.TestCase):
             x = min(0.9, max(0.1, x + 0.007 * math.cos(ang)))
             y = min(0.9, max(0.1, y + 0.007 * math.sin(ang)))
             pts.append((x, y))
-        r = self.rec.procesar([pts])
+        r = self.rec.procesar([pts], dibujando=False)          # se decide al levantar el lápiz
         self.assertEqual(r.estado, "no_definido")
         self.assertEqual(r.proyeccion, [])
 
@@ -86,6 +103,29 @@ class TestReconocedor(unittest.TestCase):
             aciertos_prefijo += self.rec.motor.classify(np.array(sim))[0] == "i"
             aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True)[0] == "i"
         self.assertGreater(aciertos_completa, aciertos_prefijo)
+
+    def test_no_definido_no_aparece_mientras_se_dibuja(self):
+        random.seed(3)
+        x, y, ang, pts = 0.4, 0.5, 0.0, []
+        for _ in range(200):
+            if random.random() < 0.1:
+                ang += random.uniform(2.4, 3.4)
+            x = min(0.9, max(0.1, x + 0.007 * math.cos(ang)))
+            y = min(0.9, max(0.1, y + 0.007 * math.sin(ang)))
+            pts.append((x, y))
+        self.assertEqual(self.rec.procesar([pts], dibujando=True).estado, "reconocido")
+
+    def test_virgulilla_primero_no_cuenta_hasta_levantar_el_lapiz(self):
+        muestra = next(m for m in self.datos["ñ"] if len(m) == 2)
+        cuerpo, tilde = self.rec.extractor.ordenar_trazos(muestra)
+        a_medias = cuerpo[: len(cuerpo) // 2]
+        con_tilde = self.rec.procesar([tilde, a_medias], dibujando=True)
+        self.rec.reiniciar()
+        sin_tilde = self.rec.procesar([a_medias], dibujando=True)
+        self.assertEqual(con_tilde.simbolos, sin_tilde.simbolos)
+        self.rec.reiniciar()
+        terminada = self.rec.procesar([tilde, cuerpo], dibujando=False)
+        self.assertEqual(terminada.simbolos, self.rec.extractor.extract_trazos([cuerpo, tilde]))
 
     def test_umbral_viene_de_los_datos(self):
         self.assertLess(self.rec.umbral, 0)
