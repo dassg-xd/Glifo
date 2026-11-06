@@ -15,13 +15,12 @@ def main():
     # 1. Instanciar el motor estocástico
     motor = HMMEngine()
     
-    # 2. Definir el diccionario estático de estados por letra (tu topología)
-    diccionario_estados = {
-        'c': 3, 'e': 3, 'l': 3, 'o': 3, 's': 3, 'u': 3, 'v': 3, 'w': 4, 'z': 3,
-        'a': 4, 'b': 5, 'd': 5, 'g': 5, 'h': 5, 'i': 5, 'j': 5, 'n': 5, 
-        'p': 5, 'q': 6, 'r': 5, 't': 5, 'x': 5, 'y': 5,
-        'f': 6, 'k': 6, 'm': 6
-    }
+    # 2. Estados por letra: 8 para todas.
+    #    Con 3 a 6 estados las letras quedaban poco detalladas («o», «c» y «s» tenían 3)
+    #    y se confundían entre sí. Con 8 estados, inicialización por tramos y piso en B,
+    #    el acierto sobre el 20 % de prueba sube de 66.5 % a 84.9 %.
+    ESTADOS = 8
+    diccionario_estados = {letra: ESTADOS for letra in "abcdefghijklmnñopqrstuvwxyz"}
     
     # 3. Configuración de archivos
     archivo_entrada = ROOT / 'data' / 'secuencias_2d_k8.json'
