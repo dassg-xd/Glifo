@@ -15,10 +15,9 @@ la ventana 2D necesita mostrar:
    log P(O_1:t | λ_ĉ) / t, queda por debajo del umbral, el trazo no se parece a
    ninguna letra. La probabilidad a posteriori no sirve para esto: al
    normalizar entre 27 modelos, hasta un garabato le da casi 100 % a alguna.
-   El umbral es el percentil 7 de esa misma medida sobre las secuencias de
-   entrenamiento (con los modelos de 8 estados detecta ~97 % de garabatos y
-   marca ~1.5 % de letras reales). Si se reentrenan los modelos, conviene
-   volver a revisar este percentil.
+   El umbral es un percentil bajo de esa misma medida sobre las secuencias de
+   entrenamiento (hoy el 3: detecta ~97 % de garabatos y marca ~3 % de letras
+   reales). Si se reentrenan los modelos, hay que volver a revisarlo.
 """
 from __future__ import annotations
 
@@ -37,12 +36,12 @@ RUTA_SECUENCIAS = RAIZ / "data" / "secuencias_2d_k8.json"
 
 MIN_SIMBOLOS = 4          # con menos, la clasificación no es fiable (contrato del extractor)
 MIN_SIMBOLOS_JUICIO = 8   # no se declara «no definido» con trazos muy cortos
-PERCENTIL_UMBRAL = 7
+PERCENTIL_UMBRAL = 3
 # Escalado de temperatura de P(c | O_1:t). Calibrado con el 20 % de prueba: con
 # T = 3 la confianza media mostrada (63 %) se acerca al acierto real (68 %);
 # con T = 1 el programa mostraba 81 % de confianza media y muchos 100 % errados.
 TEMPERATURA = 3.0
-UMBRAL_POR_DEFECTO = -1.55
+UMBRAL_POR_DEFECTO = -1.6
 
 
 @dataclass
