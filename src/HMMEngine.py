@@ -249,8 +249,14 @@ class HMMEngine:
     # ---------------------------------------------------------
     # 3. MÉTODOS DE INFERENCIA (Los que usa la GUI)
     # ---------------------------------------------------------
-    def classify(self, O, prior_uniforme=True, temperatura=1.0):
+    def classify(self, O, prior_uniforme=True, temperatura=1.0, completa=False):
         """Clasifica una secuencia (completa o parcial).
+
+        Con `completa=False` usa P(O_1:t | λ_c) = Σ_i α_t(i): la probabilidad de
+        que el trazo sea el COMIENZO de la letra (sirve mientras se dibuja).
+        Con `completa=True` usa P(O, q_T = N | λ_c) = α_T(N): exige que el modelo
+        termine en su último estado. Así una letra terminada no se confunde con
+        el comienzo de otra más larga (la «i» con la «f», la «o» con la «a»).
 
         P(c | O) ∝ P(O | λ_c)^(1/T), con prior uniforme. Con T = 1 es la
         regla de Bayes tal cual. Como P(O | λ_c) multiplica una probabilidad
@@ -268,8 +274,11 @@ class HMMEngine:
         probabilidades_log = {}
         
         for letra, modelo in self.modelos.items():
-            _, c = self._algoritmo_forward_escalado(modelo['pi'], modelo['A'], modelo['B'], O)
+            alfa, c = self._algoritmo_forward_escalado(modelo['pi'], modelo['A'], modelo['B'], O)
             log_prob = -np.sum(np.log(c + 1e-300))
+            if completa:
+                # α escalado suma 1 en cada t: log α_T(N) = log α̂_T(N) + log P(O | λ).
+                log_prob += np.log(alfa[-1, -1] + 1e-300)
             probabilidades_log[letra] = log_prob
 
         letras = list(probabilidades_log.keys())

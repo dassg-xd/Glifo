@@ -74,6 +74,19 @@ class TestReconocedor(unittest.TestCase):
         self.assertLessEqual(p3[g3], p1[g1] + 1e-12)
         self.assertAlmostEqual(sum(p3.values()), 1.0, places=6)
 
+    def test_letra_completa_no_se_confunde_con_el_comienzo_de_otra(self):
+        import numpy as np
+        # Una «i» completa («subir, subir...») es el comienzo de la «f»: como prefijo
+        # puede ganar la «f»; exigiendo terminar en el último estado gana la «i».
+        aciertos_prefijo = aciertos_completa = 0
+        for trazos in self.datos["i"][:15]:
+            sim = self.rec.extractor.extract_trazos(trazos)
+            if len(sim) < 4:
+                continue
+            aciertos_prefijo += self.rec.motor.classify(np.array(sim))[0] == "i"
+            aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True)[0] == "i"
+        self.assertGreater(aciertos_completa, aciertos_prefijo)
+
     def test_umbral_viene_de_los_datos(self):
         self.assertLess(self.rec.umbral, 0)
         self.assertGreater(self.rec.umbral, -10)
