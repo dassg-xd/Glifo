@@ -273,20 +273,28 @@ class BarraSuperior(QFrame):
         fila.addWidget(menu)
 
         conmutador = QFrame()
+        conmutador.setFixedHeight(40)
         conmutador.setObjectName("conmutador")
         conmutador.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         caja = QHBoxLayout(conmutador)
         caja.setContentsMargins(4, 4, 4, 4)
         caja.setSpacing(4)
         grupo = QButtonGroup(self)
+        self._botones_modo = {}
         for nombre, clave in (("Plano 2D", "2D"), ("Esfera 3D", "3D")):
             b = boton(nombre, "modo", alto=32)
             b.setCheckable(True)
-            b.setChecked(clave == modo)
             b.clicked.connect(lambda _=False, c=clave: self.pedir_modo.emit(c))
             grupo.addButton(b)
             caja.addWidget(b)
-        fila.addWidget(conmutador)
+            self._botones_modo[clave] = b
+        fila.addWidget(conmutador, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.modo = modo
+        self.fijar_modo(modo)
+
+    def fijar_modo(self, modo: str) -> None:
+        """Marca el modo propio de la vista (al volver a ella, el conmutador queda bien)."""
+        self._botones_modo[modo].setChecked(True)
 
 
 def espaciador_horizontal() -> QWidget:
