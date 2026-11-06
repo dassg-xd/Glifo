@@ -54,7 +54,7 @@ def to_sequences(datos: dict, fx: FeatureExtractor, min_symbols: int):
     descartadas = 0
     for letra, muestras in datos.items():
         for trazos in muestras:
-            simbolos = fx.extract(fx.join_strokes(trazos), "2d")
+            simbolos = fx.extract_trazos(trazos, "2d")
             if len(simbolos) < min_symbols:
                 descartadas += 1
                 continue

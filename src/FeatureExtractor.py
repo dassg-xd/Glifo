@@ -180,6 +180,57 @@ class FeatureExtractor:
             unidos.extend(tuple(p) for p in s)
         return unidos
 
+    @staticmethod
+    def ordenar_trazos(strokes: Sequence[Sequence[Sequence[float]]]) -> list:
+        """Orden canónico de los trazos de una letra, para que no importe en qué
+        orden se dibujaron.
+
+        * Trazos principales (largo >= 50 % del más largo): de izquierda a
+          derecha según su punto de inicio.
+        * Trazos secundarios (punto de la «i», virgulilla de la «ñ», cruz de la
+          «t»...): al final, de arriba abajo y de izquierda a derecha.
+
+        Entrenamiento y GUI deben usar el mismo orden: por eso vive aquí.
+        """
+        trazos = [[tuple(p) for p in s] for s in strokes if len(s) > 0]
+        if len(trazos) < 2:
+            return trazos
+
+        def largo(t):
+            return sum(math.dist(a, b) for a, b in zip(t, t[1:]))
+
+        largos = [largo(t) for t in trazos]
+        tope = max(largos)
+        principales = [t for t, l in zip(trazos, largos) if l >= 0.5 * tope]
+        secundarios = [t for t, l in zip(trazos, largos) if l < 0.5 * tope]
+        principales.sort(key=lambda t: t[0][0])
+        secundarios.sort(key=lambda t: (t[0][1], t[0][0]))
+        return principales + secundarios
+
+    def extract_trazos(self, strokes: Sequence[Sequence[Sequence[float]]], mode: str = "2d",
+                       con_saltos: bool = False):
+        """Varios trazos -> una sola secuencia de símbolos.
+
+        Los trazos se ordenan con `ordenar_trazos` y entre uno y otro se agrega
+        UN símbolo con la dirección del salto del lápiz (del final de un trazo
+        al inicio del siguiente). Así el salto conserva la posición relativa
+        (el punto va arriba del palito) sin pesar tanto como un trazo largo.
+
+        Con `con_saltos=True` devuelve (símbolos, índices de los símbolos de salto).
+        """
+        _check_mode(mode)
+        trazos = self.ordenar_trazos(strokes)
+        simbolos: list = []
+        saltos: list = []
+        for i, t in enumerate(trazos):
+            if i > 0:
+                (x0, y0), (x1, y1) = _check_point(trazos[i - 1][-1]), _check_point(t[0])
+                if math.hypot(x1 - x0, y1 - y0) > 1e-9:
+                    saltos.append(len(simbolos))
+                    simbolos.append(quantize_angle(math.atan2(-(y1 - y0), x1 - x0), self.k))
+            simbolos.extend(self.extract(t, mode))
+        return (simbolos, saltos) if con_saltos else simbolos
+
     # ---------------------------------------------------------- preprocesado
     def preprocess(self, points: Sequence[Sequence[float]], mode: str = "2d") -> list:
         """Puntos crudos -> puntos limpios y equiespaciados (para depurar/dibujar)."""

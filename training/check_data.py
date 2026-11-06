@@ -60,7 +60,7 @@ def main() -> int:
         for trazos in muestras:
             for t in trazos:
                 fuera += sum(1 for x, y in t if not (-0.02 <= x <= 1.02 and -0.02 <= y <= 1.02))
-            largos.append(len(fx.extract(fx.join_strokes(trazos), "2d")))
+            largos.append(len(fx.extract_trazos(trazos, "2d")))
         avisos = []
         if len(muestras) < args.meta:
             avisos.append(f"faltan {args.meta - len(muestras)} muestras")

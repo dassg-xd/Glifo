@@ -112,6 +112,28 @@ class TestExtract(unittest.TestCase):
                                                     linea((0.2, 0.2), (0.8, 0.2), 30)]))
         self.assertEqual((sec[0], sec[-1]), (2, 0))    # sube y luego va a la derecha
 
+    def test_extract_trazos_un_solo_trazo_es_extract(self):
+        pts = linea((0.2, 0.2), (0.8, 0.7), 50)
+        self.assertEqual(self.fx.extract_trazos([pts]), self.fx.extract(pts))
+
+    def test_extract_trazos_no_depende_del_orden(self):
+        # «ñ»: cuerpo (largo) y virgulilla (corta, arriba). Da igual cuál se dibuje primero.
+        cuerpo = linea((0.4, 0.42), (0.4, 0.7), 40) + linea((0.4, 0.45), (0.6, 0.7), 40)[1:]
+        tilde = linea((0.42, 0.3), (0.58, 0.32), 20)
+        self.assertEqual(self.fx.extract_trazos([cuerpo, tilde]), self.fx.extract_trazos([tilde, cuerpo]))
+        # Dos trazos principales: se ordenan de izquierda a derecha por su inicio.
+        izq = linea((0.3, 0.3), (0.6, 0.7), 40)
+        der = linea((0.6, 0.3), (0.3, 0.7), 40)
+        self.assertEqual(self.fx.extract_trazos([izq, der]), self.fx.extract_trazos([der, izq]))
+
+    def test_extract_trazos_salto_es_un_solo_simbolo(self):
+        a = linea((0.2, 0.8), (0.2, 0.4), 30)        # sube
+        b = linea((0.8, 0.8), (0.8, 0.4), 30)        # otro palito, lejos a la derecha
+        sec, saltos = self.fx.extract_trazos([a, b], con_saltos=True)
+        self.assertEqual(len(sec), len(self.fx.extract(a)) + 1 + len(self.fx.extract(b)))
+        self.assertEqual(saltos, [len(self.fx.extract(a))])
+        self.assertEqual(sec[saltos[0]], 7)           # del final de «a» (arriba) al inicio de «b» (abajo a la derecha)
+
     def test_extract_2d_es_alias(self):
         pts = linea((0.1, 0.1), (0.9, 0.9), 40)
         self.assertEqual(self.fx.extract_2d(pts), self.fx.extract(pts, "2d"))

@@ -95,7 +95,7 @@ class Reconocedor:
             self.reiniciar()
             return Resultado("vacio")
 
-        simbolos = self.extractor.extract(self.extractor.join_strokes(trazos))
+        simbolos = self.extractor.extract_trazos(trazos)
         if len(simbolos) < MIN_SIMBOLOS:
             return Resultado("pocos", simbolos=simbolos)
 
