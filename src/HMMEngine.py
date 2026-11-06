@@ -234,20 +234,49 @@ class HMMEngine:
         letra_ganadora = max(resultados, key=resultados.get)
         return letra_ganadora, resultados
         
-    def project(self, O, pasos_a_proyectar=10):
-        """Proyecta qué símbolo emitir en cada estado restante."""
-        letra_predicha, _ = self.classify(O)
+    @staticmethod
+    def duraciones_esperadas(A, maximo=20):
+        """Duración esperada (en símbolos) de cada estado: d_i = 1 / (1 - a_ii).
+
+        En un modelo izquierda-derecha la permanencia en un estado es geométrica,
+        así que su media es 1/(1 - a_ii). El último estado es absorbente
+        (a_NN = 1, duración infinita): se le asigna la media de los demás.
+        """
+        diag = np.diag(A)
+        d = np.zeros(len(diag))
+        for i, a in enumerate(diag):
+            d[i] = maximo if a >= 1.0 - 1e-9 else min(maximo, 1.0 / (1.0 - a))
+        if len(d) > 1 and diag[-1] >= 1.0 - 1e-9:
+            d[-1] = np.mean(d[:-1])
+        return d
+
+    def project(self, O, pasos_a_proyectar=None, letra=None):
+        """Proyecta los símbolos restantes {O_t+1, ..., O_T} de la letra más probable.
+
+        1. ĉ = argmax_c P(O_1:t | λ_c)  (o `letra`, si la GUI ya la conoce).
+        2. Estado actual: argmax_i α_t(i) en el modelo de ĉ.
+        3. Se recorre la trayectoria aprendida: en cada estado, desde el actual
+           hasta el último, se emite el símbolo más probable argmax_k b_i(k)
+           durante su duración esperada. Del estado actual solo se proyecta la
+           mitad de su duración, porque parte ya se dibujó.
+
+        `pasos_a_proyectar` limita la cantidad de símbolos (None = hasta el final).
+        Devuelve (letra, lista de símbolos).
+        """
+        letra_predicha = letra if letra is not None else self.classify(O)[0]
         modelo = self.modelos[letra_predicha]
-        
-        alfa, _ = self._algoritmo_forward_escalado(modelo['pi'], modelo['A'], modelo['B'], O)
-        estado_actual = np.argmax(alfa[-1, :]) 
-        
+        A, B = modelo['A'], modelo['B']
+
+        alfa, _ = self._algoritmo_forward_escalado(modelo['pi'], A, B, O)
+        estado_actual = int(np.argmax(alfa[-1, :]))
+        duraciones = self.duraciones_esperadas(A)
+
         emisiones_proyectadas = []
-        
-        for _ in range(pasos_a_proyectar):
-            simbolo = np.argmax(modelo['B'][estado_actual, :])
-            emisiones_proyectadas.append(int(simbolo))
-            
-            estado_actual = np.argmax(modelo['A'][estado_actual, :])
-            
+        for estado in range(estado_actual, A.shape[0]):
+            pasos = duraciones[estado] / 2.0 if estado == estado_actual else duraciones[estado]
+            simbolo = int(np.argmax(B[estado, :]))
+            emisiones_proyectadas.extend([simbolo] * int(round(pasos)))
+
+        if pasos_a_proyectar is not None:
+            emisiones_proyectadas = emisiones_proyectadas[:pasos_a_proyectar]
         return letra_predicha, emisiones_proyectadas
