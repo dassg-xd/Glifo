@@ -245,8 +245,19 @@ class HMMEngine:
     # ---------------------------------------------------------
     # 3. MÉTODOS DE INFERENCIA (Los que usa la GUI)
     # ---------------------------------------------------------
-    def classify(self, O, prior_uniforme=True):
-        """Clasifica una secuencia (completa o parcial)."""
+    def classify(self, O, prior_uniforme=True, temperatura=1.0):
+        """Clasifica una secuencia (completa o parcial).
+
+        P(c | O) ∝ P(O | λ_c)^(1/T), con prior uniforme. Con T = 1 es la
+        regla de Bayes tal cual. Como P(O | λ_c) multiplica una probabilidad
+        por símbolo, en 20-30 símbolos cualquier diferencia se amplifica y casi
+        siempre una letra se queda con ~100 % aunque esté equivocada. T > 1
+        (escalado de temperatura) suaviza esos porcentajes para que la
+        confianza mostrada se parezca al acierto real. No cambia el orden del
+        ranking ni la letra ganadora.
+        """
+        if temperatura <= 0:
+            raise ValueError("temperatura debe ser positiva.")
         if not self.modelos:
             raise ValueError("No hay modelos cargados.")
             
@@ -258,9 +269,9 @@ class HMMEngine:
             probabilidades_log[letra] = log_prob
 
         letras = list(probabilidades_log.keys())
-        log_probs_array = np.array(list(probabilidades_log.values()))
-        
-        log_probs_array -= np.max(log_probs_array) 
+        log_probs_array = np.array(list(probabilidades_log.values())) / temperatura
+
+        log_probs_array -= np.max(log_probs_array)
         probs = np.exp(log_probs_array)
         
         suma_probs = np.sum(probs)

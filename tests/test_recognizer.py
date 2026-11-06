@@ -64,6 +64,16 @@ class TestReconocedor(unittest.TestCase):
         self.assertEqual(r.estado, "no_definido")
         self.assertEqual(r.proyeccion, [])
 
+    def test_temperatura_suaviza_sin_cambiar_el_orden(self):
+        import numpy as np
+        simbolos = self.rec.extractor.extract(self.rec.extractor.join_strokes(self.datos["m"][0]))
+        g1, p1 = self.rec.motor.classify(np.array(simbolos), temperatura=1.0)
+        g3, p3 = self.rec.motor.classify(np.array(simbolos), temperatura=3.0)
+        self.assertEqual(g1, g3)
+        self.assertEqual(sorted(p1, key=p1.get), sorted(p3, key=p3.get))
+        self.assertLessEqual(p3[g3], p1[g1] + 1e-12)
+        self.assertAlmostEqual(sum(p3.values()), 1.0, places=6)
+
     def test_umbral_viene_de_los_datos(self):
         self.assertLess(self.rec.umbral, 0)
         self.assertGreater(self.rec.umbral, -10)
