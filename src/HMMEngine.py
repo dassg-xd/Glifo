@@ -157,20 +157,24 @@ class HMMEngine:
 
         pi_new = pi_num / np.sum(pi_num)
         
-        A_new = np.zeros((N, N))
+        # Un estado que no recibió ninguna probabilidad en esta iteración
+        # (denominador 0) conserva sus parámetros anteriores; si no, su fila
+        # quedaría en 0/0 y llenaría el modelo de NaN.
+        A_new = A.copy()
         for i in range(N):
-            if A_den[i] > 0:
+            if A_den[i] > 1e-12 and np.sum(A_num[i, :]) > 1e-12:
                 A_new[i, :] = A_num[i, :] / A_den[i]
-                
-        B_new = np.zeros((N, M))
+
+        B_new = B.copy()
         for i in range(N):
-            if B_den[i] > 0:
+            if B_den[i] > 1e-12:
                 B_new[i, :] = B_num[i, :] / B_den[i]
 
         A_new = np.triu(A_new)
         for i in range(N):
             A_new[i, i+2:] = 0.0
-        A_new = A_new / np.sum(A_new, axis=1, keepdims=True)
+        filas = np.sum(A_new, axis=1, keepdims=True)
+        A_new = np.where(filas > 0, A_new / np.where(filas > 0, filas, 1.0), A)
 
         if piso > 0:
             B_new = np.maximum(B_new, piso)
