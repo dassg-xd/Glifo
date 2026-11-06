@@ -176,7 +176,7 @@ class TestDatasetReal(unittest.TestCase):
         fx = FeatureExtractor()
         for letra in ("a", "l", "o"):
             for trazos in datos[letra][:5]:
-                sec = fx.extract(fx.join_strokes(trazos))
+                sec = fx.extract_trazos(trazos)
                 self.assertGreater(len(sec), 3)
                 self.assertTrue(all(0 <= s < 8 for s in sec))
                 self.assertTrue(all(math.isfinite(x) and math.isfinite(y) for t in trazos for x, y in t))
