@@ -48,9 +48,15 @@ PERCENTIL_UMBRAL = 3
 # T = 3 la confianza media mostrada (63 %) se acerca al acierto real (68 %);
 # con T = 1 el programa mostraba 81 % de confianza media y muchos 100 % errados.
 TEMPERATURA = 3.0
+# Al levantar el lápiz, cuánto pesa exigir que el modelo termine en su último estado
+# (ver HMMEngine.classify). Elegido con las secuencias de ENTRENAMIENTO del dataset de un
+# diseño por letra: 0.2 dio 92.9 % (1 = solo letra completa: 90.1 %; 0 = solo prefijo:
+# 92.2 %). En el 20 % de prueba: 93.8 %.
+PESO_FINAL = 0.2
 UMBRAL_POR_DEFECTO = -1.6
 ESCALA_MIN, ESCALA_MAX = 0.75, 1.33
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
+
 
 def es_secundario_previo(terminado, actual) -> bool:
     """¿Un trazo ya terminado debe esperar al lápiz arriba mientras se dibuja `actual`?
@@ -243,7 +249,7 @@ class Reconocedor:
         if clave != self._cache_clave:
             # Solo se recalcula el HMM cuando aparece un símbolo nuevo o se levanta el lápiz.
             letra, probs = self.motor.classify(np.asarray(simbolos, dtype=int), temperatura=TEMPERATURA,
-                                               completa=not dibujando)
+                                               completa=not dibujando, peso_final=PESO_FINAL)
             ordenadas = sorted(((l, float(p)) for l, p in probs.items()), key=lambda x: -x[1])
             vps = self.verosimilitud_por_simbolo(simbolos, letra)
             # «No definido» solo se decide con el lápiz arriba: a mitad de un trazo,

@@ -93,16 +93,26 @@ class TestReconocedor(unittest.TestCase):
 
     def test_letra_completa_no_se_confunde_con_el_comienzo_de_otra(self):
         import numpy as np
-        # Una «i» completa («subir, subir...») es el comienzo de la «f»: como prefijo
-        # puede ganar la «f»; exigiendo terminar en el último estado gana la «i».
-        aciertos_prefijo = aciertos_completa = 0
+        from src.gui.recognizer import PESO_FINAL
+        # Una «i» completa es el comienzo de letras más largas (la «f», la «l»): al
+        # levantar el lápiz, pedir que el modelo termine en su último estado nunca debe
+        # acertar menos que el prefijo, y la mayoría de las «i» deben reconocerse.
+        aciertos_prefijo = aciertos_completa = total = 0
         for trazos in self.datos["i"][:15]:
             sim = self.rec.extractor.extract_trazos(trazos)
             if len(sim) < 4:
                 continue
+            total += 1
             aciertos_prefijo += self.rec.motor.classify(np.array(sim))[0] == "i"
-            aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True)[0] == "i"
-        self.assertGreater(aciertos_completa, aciertos_prefijo)
+            aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True,
+                                                         peso_final=PESO_FINAL)[0] == "i"
+        self.assertGreaterEqual(aciertos_completa, aciertos_prefijo)
+        self.assertGreaterEqual(aciertos_completa / total, 0.8)
+
+    def test_peso_final_valida_el_rango(self):
+        import numpy as np
+        with self.assertRaises(ValueError):
+            self.rec.motor.classify(np.array([6, 6, 6, 6]), completa=True, peso_final=1.5)
 
     def test_no_definido_no_aparece_mientras_se_dibuja(self):
         random.seed(3)

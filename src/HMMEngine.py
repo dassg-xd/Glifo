@@ -275,7 +275,7 @@ class HMMEngine:
     # ---------------------------------------------------------
     # 3. MÉTODOS DE INFERENCIA (Los que usa la GUI)
     # ---------------------------------------------------------
-    def classify(self, O, prior_uniforme=True, temperatura=1.0, completa=False):
+    def classify(self, O, prior_uniforme=True, temperatura=1.0, completa=False, peso_final=1.0):
         """Clasifica una secuencia (completa o parcial).
 
         Con `completa=False` usa P(O_1:t | λ_c) = Σ_i α_t(i): la probabilidad de
@@ -283,6 +283,13 @@ class HMMEngine:
         Con `completa=True` usa P(O, q_T = N | λ_c) = α_T(N): exige que el modelo
         termine en su último estado. Así una letra terminada no se confunde con
         el comienzo de otra más larga (la «i» con la «f», la «o» con la «a»).
+
+        `peso_final` (0..1, solo con `completa=True`) mezcla los dos criterios:
+        log P = log Σ_i α_T(i) + peso_final · log(α_T(N) / Σ_i α_T(i)).
+        Con 1 es α_T(N) completo; con 0, el prefijo. Exigir el último estado del
+        todo castiga a las letras cuyo final varía mucho entre personas (con el
+        dataset de un diseño por letra, la «n» se iba a «h»); un peso intermedio
+        conserva la ventaja sin ese costo.
 
         P(c | O) ∝ P(O | λ_c)^(1/T), con prior uniforme. Con T = 1 es la
         regla de Bayes tal cual. Como P(O | λ_c) multiplica una probabilidad
@@ -294,6 +301,8 @@ class HMMEngine:
         """
         if temperatura <= 0:
             raise ValueError("temperatura debe ser positiva.")
+        if not 0.0 <= peso_final <= 1.0:
+            raise ValueError("peso_final debe estar entre 0 y 1.")
         if not self.modelos:
             raise ValueError("No hay modelos cargados.")
             
@@ -304,7 +313,7 @@ class HMMEngine:
             log_prob = -np.sum(np.log(c + 1e-300))
             if completa:
                 # α escalado suma 1 en cada t: log α_T(N) = log α̂_T(N) + log P(O | λ).
-                log_prob += np.log(alfa[-1, -1] + 1e-300)
+                log_prob += peso_final * np.log(alfa[-1, -1] + 1e-300)
             probabilidades_log[letra] = log_prob
 
         letras = list(probabilidades_log.keys())
