@@ -170,6 +170,29 @@ class Reconocedor:
             plantillas[letra] = Plantilla(simbolos, segmentos, ruta)
         return plantillas
 
+    def _alinear(self, simbolos, letra: str, plantilla: Plantilla):
+        """(τ, escala) o None. τ es el símbolo de la plantilla alineado con el último del
+        usuario (por los estados de Viterbi) y la escala, cuánto más grande o pequeña
+        está dibujando la letra. None si a la plantilla ya no le queda nada."""
+        m = self.motor.modelos[letra]
+        ruta_usuario, _ = self.motor.viterbi_log(m["pi"], m["A"], m["B"], simbolos)
+        estado = int(ruta_usuario[-1])
+        en_estado = int(np.sum(np.cumprod((ruta_usuario[::-1] == estado).astype(int))))
+        indices = np.nonzero(plantilla.ruta >= estado)[0]
+        if len(indices) == 0:
+            return None
+        inicio = int(indices[0])
+        fin_estado = int(np.nonzero(plantilla.ruta == estado)[0][-1]) if np.any(plantilla.ruta == estado) else inicio
+        tau = min(fin_estado, inicio + en_estado - 1)
+        # Con un estado por símbolo (letras cortas como la «i»), la ruta del usuario puede
+        # caer en el último estado antes de tiempo; nunca se va más allá de lo dibujado.
+        tau = min(tau, len(simbolos) - 1)
+        if tau + 1 >= len(plantilla.segmentos):
+            return None
+        # Cada símbolo es un paso fijo de remuestreo, así que el cociente entre los
+        # símbolos del usuario y los de la plantilla hasta τ estima el tamaño relativo.
+        return tau, min(ESCALA_MAX, max(ESCALA_MIN, len(simbolos) / (tau + 1)))
+
     def _proyectar(self, simbolos, letra: str, cursor) -> list:
         """Tramos [(x, y)...] con lo que le falta a la letra, desde el cursor."""
         plantilla = self.plantillas.get(letra)
@@ -178,27 +201,11 @@ class Reconocedor:
             _, restantes = self.motor.project(np.asarray(simbolos, dtype=int), letra=letra)
             return [self.extractor.symbols_to_points(restantes, start=cursor)] if restantes else []
 
-        m = self.motor.modelos[letra]
-        ruta_usuario, _ = self.motor.viterbi_log(m["pi"], m["A"], m["B"], simbolos)
-        estado = int(ruta_usuario[-1])
-        en_estado = int(np.sum(np.cumprod((ruta_usuario[::-1] == estado).astype(int))))
-        indices = np.nonzero(plantilla.ruta >= estado)[0]
-        if len(indices) == 0:
+        alineacion = self._alinear(simbolos, letra, plantilla)
+        if alineacion is None:
             return []
-        inicio = int(indices[0])
-        fin_estado = int(np.nonzero(plantilla.ruta == estado)[0][-1]) if np.any(plantilla.ruta == estado) else inicio
-        tau = min(fin_estado, inicio + en_estado - 1)       # símbolo de la plantilla alineado con el último del usuario
-        # Con un estado por símbolo (letras cortas como la «i»), la ruta del usuario puede
-        # caer en el último estado antes de tiempo; nunca se va más allá de lo dibujado.
-        tau = min(tau, len(simbolos) - 1)
+        tau, escala = alineacion
         restantes = plantilla.segmentos[tau + 1:]
-        if not restantes:
-            return []
-
-        # Tamaño: cada símbolo es un paso fijo de remuestreo, así que el cociente entre
-        # los símbolos del usuario y los de la plantilla hasta τ estima cuánto más
-        # grande o pequeña está dibujando la letra.
-        escala = min(ESCALA_MAX, max(ESCALA_MIN, len(simbolos) / (tau + 1)))
         ancla = plantilla.segmentos[tau][1]
 
         def llevar(p):
