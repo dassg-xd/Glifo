@@ -5,9 +5,8 @@ guide_popup.py
 la guía de dibujo de Glifo Capture: la letra completa en gris y, encima, cada
 trazo se dibuja solo y en orden, con su número donde empieza.
 
-Los trazos son los prototipos de data/guia_trazos.json (el trazo mediano del
-dataset, ver training/generar_guia.py): la guía enseña el mismo diseño con el
-que aprenden los modelos.
+Los trazos son los de la guía de dibujo de Glifo Capture, hechos a mano
+(data/guia_dibujo.json): curvas limpias y simétricas, solo para mostrar.
 """
 from __future__ import annotations
 
@@ -30,7 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import theme as T
-from .guia_trazos import GUIA, puntos_de_camino
+from .guia_trazos import GUIA_DIBUJO, puntos_de_camino
 from .widgets import dibujar_letra, etiqueta
 
 # Ventana del espacio 0..1000 que se muestra (la misma de Glifo Capture): x 200..800, y 130..930.
@@ -73,7 +72,7 @@ class VistaPrevia(QWidget):
     # --------------------------------------------------------------- datos
     def fijar(self, letra: str):
         self.letra = letra
-        self._trazos = [puntos_de_camino(c, 3.0) for c in GUIA.get(letra, [])]
+        self._trazos = [puntos_de_camino(c, 3.0) for c in GUIA_DIBUJO.get(letra, [])]
         self._largos = [sum(math.dist(a, b) for a, b in zip(t, t[1:])) for t in self._trazos]
         self._inicios, t = [], ESPERA_INICIAL
         for largo in self._largos:
@@ -251,7 +250,7 @@ class PanelGuia(QFrame):
         titulos = QVBoxLayout()
         titulos.setSpacing(4)
         titulos.addWidget(etiqueta("Cómo se dibuja cada letra", 18, T.TINTA, True))
-        titulos.addWidget(etiqueta("Sigue el orden de los números: es el mismo diseño del dataset y de Glifo Capture.", 13, T.APAGADO))
+        titulos.addWidget(etiqueta("Sigue el orden de los números: es la misma guía de Glifo Capture.", 13, T.APAGADO))
         cabecera.addLayout(titulos, 1)
         x = QPushButton("✕")
         x.setFixedSize(32, 32)
