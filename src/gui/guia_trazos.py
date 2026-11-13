@@ -1,63 +1,34 @@
 """
 guia_trazos.py
 ==============
-Cómo se traza cada letra, trazo por trazo y en orden: los mismos patrones de la
-guía de dibujo de Glifo Capture (docs/guia.js de Glifo-Capture-Pages), que es
-el diseño único por letra con el que se capturó el dataset.
+Cómo se traza cada letra, trazo por trazo y en orden. Los caminos salen DEL
+DATASET (data/guia_trazos.json, generado con training/generar_guia.py): cada
+trazo es el trazo mediano de todas las muestras de la letra, así que la guía
+enseña exactamente el diseño único por letra con el que aprenden los modelos.
+El mismo archivo, en formato JS, es la guía de dibujo de Glifo Capture.
 
 Coordenadas en el espacio de 0 a 1000 del lienzo (la y crece hacia abajo) y
 sobre las mismas líneas guía: ascendente 180, altura x 420, línea base 700,
 descendente 900. Cada trazo es un camino SVG con M, L y C; el orden de la lista
 es el orden en que se dibuja. Un trazo que vuelve sobre sí mismo (la «n» baja,
 sube por el mismo palito y hace el arco) es UN solo trazo.
-
-Si se cambia un patrón en Glifo Capture, se cambia aquí igual.
 """
 from __future__ import annotations
 
+import json
 import math
 import re
+from pathlib import Path
 
-BARRIGA = "M600 475 C575 435 535 420 495 420 C430 420 390 490 390 560 C390 640 435 700 495 700 C550 700 595 655 605 590"
-
-
-def _punto(x: float, y: float) -> str:
-    return f"M{x} {y} L{x} {y + 1}"
+RUTA_GUIA = Path(__file__).resolve().parents[2] / "data" / "guia_trazos.json"
 
 
-def _arco_n(x0: float, x1: float) -> str:
-    return f"C{x0 + 30} 450 {x0 + 70} 420 {x0 + 115} 420 C{x1 - 30} 420 {x1} 460 {x1} 520 L{x1} 700"
+def _cargar_guia(ruta: Path = RUTA_GUIA) -> dict[str, list[str]]:
+    with open(ruta, encoding="utf-8") as f:
+        return json.load(f)["guia"]
 
 
-GUIA: dict[str, list[str]] = {
-    "a": [BARRIGA, "M610 475 L610 660 C610 690 625 700 650 700"],
-    "b": ["M410 180 L410 700 L410 600 C420 480 480 420 530 420 C590 420 620 490 620 560 C620 640 580 700 520 700 C470 700 430 670 410 640"],
-    "c": ["M600 480 C570 430 530 420 495 420 C430 420 390 490 390 560 C390 640 435 700 495 700 C540 700 580 680 605 640"],
-    "d": [BARRIGA, "M610 180 L610 700"],
-    "e": ["M400 565 L610 565 C610 480 560 420 500 420 C435 420 390 490 390 560 C390 640 440 700 505 700 C550 700 585 680 605 650"],
-    "f": ["M610 230 C590 190 560 180 530 180 C480 180 455 220 455 280 L455 700", "M380 420 L560 420"],
-    "g": [BARRIGA, "M610 475 L610 800 C610 880 550 900 490 900 C450 900 420 885 400 860"],
-    "h": ["M410 180 L410 700 L410 520 " + _arco_n(410, 610)],
-    "i": ["M500 420 L500 700", _punto(500, 320)],
-    "j": ["M520 420 L520 800 C520 870 480 900 430 900 C400 900 380 890 365 870", _punto(520, 320)],
-    "k": ["M410 180 L410 700", "M590 430 L415 590 L600 700"],
-    "l": ["M500 180 L500 660 C500 690 515 700 545 700"],
-    "m": ["M360 420 L360 700 L360 520 C380 450 410 420 445 420 C485 420 505 455 505 520 L505 700 L505 520 C525 450 555 420 590 420 C630 420 650 455 650 520 L650 700"],
-    "n": ["M410 420 L410 700 L410 520 " + _arco_n(410, 610)],
-    "ñ": ["M410 420 L410 700 L410 520 " + _arco_n(410, 610), "M420 340 C450 300 480 300 510 330 C540 360 570 360 600 320"],
-    "o": ["M500 420 C435 420 390 490 390 560 C390 640 435 700 500 700 C565 700 610 640 610 560 C610 490 565 420 500 420"],
-    "p": ["M410 470 L410 900", "M410 470 C432 435 475 420 525 420 C585 420 615 490 615 560 C615 640 575 700 520 700 C470 700 430 670 410 630"],
-    "q": [BARRIGA, "M610 475 L610 900", "M540 820 L680 820"],
-    "r": ["M420 420 L420 700 L420 530 C450 455 500 420 560 420 C585 420 600 425 615 435"],
-    "s": ["M600 460 C580 430 540 420 500 420 C450 420 410 445 410 490 C410 535 450 550 500 560 C555 570 600 590 600 635 C600 680 555 700 500 700 C450 700 410 685 395 655"],
-    "t": ["M480 250 L480 650 C480 690 505 700 535 700 C560 700 580 690 595 675", "M400 420 L580 420"],
-    "u": ["M400 420 L400 610 C400 670 440 700 495 700 C550 700 600 665 600 600 L600 420 L600 700"],
-    "v": ["M390 420 L500 700 L610 420"],
-    "w": ["M340 420 L420 700 L500 500 L580 700 L660 420"],
-    "x": ["M400 420 L600 700", "M600 420 L400 700"],
-    "y": ["M400 420 L505 690", "M610 420 L470 820 C450 875 420 900 380 900"],
-    "z": ["M400 420 L600 420 L400 700 L610 700"],
-}
+GUIA: dict[str, list[str]] = _cargar_guia()
 
 _TOKEN = re.compile(r"[MLC]|-?\d+(?:\.\d+)?")
 
