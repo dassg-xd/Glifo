@@ -86,7 +86,7 @@ La ventana 2D tiene:
 - **Proyección punteada** de lo que le falta a la letra más probable, que se actualiza con cada símbolo nuevo. Se ajusta a lo que ya dibujaste: arranca en el cursor y termina donde le corresponde a TU letra (su tamaño y su línea base).
 - **Ranking** de P(c | O₁:ₜ): las 4 letras más probables y el resto agrupado.
 - **«Trazo no definido»** cuando el trazo no se parece a ninguna letra. En ese caso no se dibuja proyección.
-- **«Guía de letras»**: anima cada letra trazo por trazo, en orden y con sus números, como la guía de Glifo Capture. Es el diseño del propio dataset (ver «La guía de dibujo» más abajo).
+- **«Guía de letras»**: anima cada letra trazo por trazo, en orden y con sus números, como la guía de Glifo Capture. Muestra la misma guía hecha a mano de Glifo Capture (`data/guia_dibujo.json`).
 
 La ventana 3D tiene la misma estructura, con una **esfera** como lienzo:
 
@@ -155,11 +155,10 @@ Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **91.6 %** solo c
 ### La guía de dibujo
 
 ```bash
-python training/generar_guia.py                          # -> data/guia_trazos.json (la usa la app)
-python training/generar_guia.py --js ../Glifo-Capture-Pages/docs/guia.js   # además, la de Glifo Capture
+python training/generar_guia.py                          # -> data/guia_trazos.json (plantillas del reconocedor)
 ```
 
-La guía sale **del dataset**: cada trazo es el trazo mediano de todas las muestras de la letra (remuestreadas por longitud de arco), suavizado con curvas de Bézier. Así enseña exactamente el diseño con el que aprenden los modelos. Con la guía hecha a mano, que no coincidía con el dataset en la «x», la «k», la «d», la «p» o la «y», quien la seguía tenía 85.6 % de acierto; con la generada, 98.6 % en 2D y 99.5 % en 3D. **Volver a generarla cada vez que cambie el dataset** (`tests/test_guia.py` avisa si quedó desactualizada).
+Hay dos guías. La que **se muestra** en la «Guía de letras» es la de Glifo Capture, hecha a mano (`data/guia_dibujo.json`, copiada de su `docs/guia.js`): solo es visual. La que **usa el reconocedor** como plantilla para proyectar el trazo probable sale **del dataset**: cada trazo es el trazo mediano de todas las muestras de la letra (remuestreadas por longitud de arco), suavizado con curvas de Bézier. Así coincide con el diseño con el que aprenden los modelos. Con la guía hecha a mano como plantilla, que no coincidía con el dataset en la «x», la «k», la «d», la «p» o la «y», quien la seguía tenía 85.6 % de acierto; con la generada, 98.6 % en 2D y 99.5 % en 3D. **Volver a generarla cada vez que cambie el dataset** (`tests/test_guia.py` avisa si quedó desactualizada).
 
 ### Cómo decide la letra
 
@@ -215,8 +214,8 @@ Glifo/
 │       ├── canvas_2d.py          # Lienzo con líneas guía y proyección
 │       ├── canvas_3d.py          # Esfera con OpenGL: dibujar, girar, acercar
 │       ├── ranking_panel.py      # Listado de probabilidades
-│       ├── guide_popup.py        # Guía de letras (animada)
-│       ├── guia_trazos.py        # Lee la guía de dibujo y la convierte en puntos
+│       ├── guide_popup.py        # Guía de letras (animada, trazos de Glifo Capture)
+│       ├── guia_trazos.py        # Lee las dos guías y las convierte en puntos
 │       ├── recognizer.py         # Puente FeatureExtractor + HMMEngine
 │       ├── recognizer_3d.py      # El mismo puente para la esfera (marco de la vista, solo lo visible)
 │       ├── widgets.py            # Componentes visuales compartidos
@@ -243,7 +242,8 @@ Glifo/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
 │   ├── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
 │   ├── secuencias_3d_k8.json     # Secuencias 3D sintéticas GENERADAS
-│   ├── guia_trazos.json          # Guía de dibujo GENERADA del dataset
+│   ├── guia_trazos.json          # Plantillas GENERADAS del dataset (reconocedor)
+│   ├── guia_dibujo.json          # Guía que se muestra (la de Glifo Capture, hecha a mano)
 │   ├── modelos_letras_entrenados.json  # Modelos HMM del modo 2D
 │   └── modelos_letras_3d.json    # Modelos HMM del modo 3D
 ├── requirements.txt
