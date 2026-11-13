@@ -1,5 +1,5 @@
 """
-Pruebas de FeatureExtractor (2D).
+Pruebas de FeatureExtractor (2D y 3D).
 
 Ejecutar desde la raíz del proyecto:
     python -m unittest discover -s tests -v
@@ -195,9 +195,9 @@ class TestValidaciones(unittest.TestCase):
             with self.assertRaises(ValueError, msg=f"mode={mode!r}"):
                 fx.symbols_to_points([0], (0.5, 0.5), mode)
 
-    def test_3d_aun_no_implementado(self):
-        with self.assertRaises(NotImplementedError):
-            FeatureExtractor().extract([(0, 0, 1), (0.1, 0, 1)], "3d")
+    def test_3d_rechaza_puntos_2d(self):
+        with self.assertRaises(ValueError):
+            FeatureExtractor().extract([(0.1, 0.5), (0.9, 0.5)], "3d")
 
     def test_puntos_no_finitos(self):
         fx = FeatureExtractor()
