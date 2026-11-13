@@ -245,6 +245,13 @@ class Reconocedor:
         if len(simbolos) < MIN_SIMBOLOS:
             return Resultado("pocos", simbolos=simbolos)
 
+        r = self._evaluar(simbolos, dibujando)
+        proyeccion = [] if r.estado == "no_definido" else self._proyectar(r.simbolos, r.letra, cursor)
+        return Resultado(r.estado, r.simbolos, r.probabilidades, r.letra, proyeccion, r.verosimilitud)
+
+    def _evaluar(self, simbolos, dibujando: bool) -> Resultado:
+        """Clasificación y «no definido» de una secuencia (sin proyección). La comparten
+        los modos 2D y 3D: solo cambia de dónde salen los símbolos."""
         clave = (tuple(simbolos), dibujando)
         if clave != self._cache_clave:
             # Solo se recalcula el HMM cuando aparece un símbolo nuevo o se levanta el lápiz.
@@ -259,7 +266,4 @@ class Reconocedor:
             self._cache = Resultado("no_definido" if no_definido else "reconocido",
                                     simbolos=simbolos, probabilidades=ordenadas, letra=letra,
                                     verosimilitud=vps)
-
-        r = self._cache
-        proyeccion = [] if r.estado == "no_definido" else self._proyectar(r.simbolos, r.letra, cursor)
-        return Resultado(r.estado, r.simbolos, r.probabilidades, r.letra, proyeccion, r.verosimilitud)
+        return self._cache
