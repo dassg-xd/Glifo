@@ -1,4 +1,4 @@
-# Contrato del FeatureExtractor (primera entrega: 2D)
+# Contrato del FeatureExtractor (2D y 3D)
 
 Convenciones que deben respetar el **HMMEngine** (Integrante 1) y la **GUI** (Integrante 3). Si algo cambia aquí, se avisa a los otros dos antes de tocar el código.
 
@@ -50,7 +50,7 @@ FeatureExtractor.ordenar_trazos(trazos) # solo el orden canónico
 FeatureExtractor.join_strokes(trazos)   # varios trazos -> una polilínea (ya no se usa para extraer)
 ```
 
-- `mode` es opcional y vale `"2d"`; `"3d"` lanza `NotImplementedError` hasta la segunda entrega y cualquier otro valor lanza `ValueError`.
+- `mode` es opcional y vale `"2d"` o `"3d"` (ver sección 8); cualquier otro valor lanza `ValueError`.
 - `k` solo admite 8 o 16. Puntos con NaN/inf, con otra dimensión o no numéricos lanzan `ValueError`, igual que símbolos fuera de rango en `symbols_to_points`.
 - `ALPHABET`: las 27 letras, con `ñ`.
 - Usar siempre los valores por defecto del extractor, **sin copiarlos a mano**, para que entrenamiento y GUI coincidan.
@@ -98,3 +98,53 @@ python training/build_sequences.py                   # dataset -> secuencias (K=
 python training/build_sequences.py --holdout 0       # todo a entrenamiento
 python -m unittest discover -s tests -v              # pruebas
 ```
+
+## 8. Modo 3D (esfera)
+
+### Marco de la vista
+
+Los puntos llegan como `(x, y, z)` sobre la esfera unitaria, en el **marco de la vista**: `x` a la derecha, `y` hacia arriba de la pantalla, `z` hacia quien mira. La GUI guarda los trazos pegados a la esfera y, antes de analizar, los multiplica por la rotación actual (`v = R · p`). Con eso:
+
+- **«Arriba» es siempre el borde superior del panel**, gire como gire la esfera.
+- **Solo cuenta lo que se ve** (`z > 0`). Un trazo que pasa por detrás queda partido en sus tramos visibles, que se unen con un símbolo de salto, igual que dos trazos.
+
+### De (x, y, z) a símbolos
+
+| Paso | Fórmula |
+|---|---|
+| Coordenadas esféricas | θ = atan2(x, z) (acimut, crece a la derecha) · φ = arccos(y) (polar, 0 arriba y π/2 en el centro de la vista) |
+| Variaciones | Δθ (llevado a [−π, π]) y Δφ entre dos puntos seguidos |
+| Rumbo sobre la superficie | este = sin φ̄ · Δθ · norte = −Δφ · rumbo = atan2(norte, este) |
+| Símbolo | `quantize_angle(rumbo, K)`: los mismos 8 símbolos del 2D |
+
+El factor sin φ̄ (φ̄ = promedio de los dos φ) hace falta porque, lejos del centro, un mismo Δθ recorre menos distancia: sin él, una diagonal parecería horizontal.
+
+### Remuestreo y tamaño
+
+- El remuestreo es por **longitud de arco sobre círculos máximos**, con un paso **angular** (interpolación esférica entre puntos).
+- `ANGULO_LIENZO = 1.6` rad equivale al lado del lienzo 2D sin zoom; el paso por defecto es `0.03 × 1.6 = 0.048` rad. Así una letra de tamaño cómodo da tantos símbolos como en el plano (la «a» promedia 29.9 símbolos en 3D y 30.2 en 2D).
+- Con zoom `z` la GUI usa `paso = 0.048 / z`: una letra del mismo tamaño en pantalla produce los mismos símbolos.
+
+### API 3D
+
+```python
+fx = FeatureExtractor()                              # paso_angular = 0.048 rad
+fx.extract_trazos(trazos_vista, "3d")                # trazos (x, y, z) -> símbolos (solo lo visible)
+fx.extract(puntos_vista, "3d")                       # un trazo
+fx.preprocess(puntos_vista, "3d")                    # puntos suavizados y equiespaciados sobre la esfera
+fx.symbols_to_points(simbolos, inicio, "3d")         # camina por círculos máximos desde `inicio`
+FeatureExtractor.ordenar_trazos_3d(trazos)           # orden canónico: θ en lugar de x, φ en lugar de y
+
+a_esfericas(p) / de_esfericas(theta, phi)            # (x, y, z) <-> (θ, φ)
+rumbo(a, b)                                          # dirección de a hacia b con (Δθ, Δφ)
+mover(p, rumbo, distancia)                           # avanzar por el círculo máximo
+visibles(trazo)                                      # tramos con z > 0
+pegar_en_esfera(trazos_2d, theta0, phi0, lado, giro) # lienzo 2D -> esfera (mapa exponencial)
+```
+
+Los puntos 3D se normalizan a la esfera; el origen, NaN, infinitos u otra dimensión lanzan `ValueError`.
+
+### Dataset y modelos 3D
+
+`python training/build_sequences_3d.py` pega cada muestra 2D sobre la cara visible con `pegar_en_esfera` (centro θ ∈ ±0.35, φ ∈ π/2 ± 0.30; tamaño ±30 %; giro ±8°), 4 veces las de entrenamiento y 2 las de prueba, y escribe `data/secuencias_3d_k8.json`. `python training/entrenar_hmms.py --modo 3d` entrena `data/modelos_letras_3d.json`. **Cambiar el paso, `ANGULO_LIENZO` o los rangos obliga a regenerar y reentrenar.**
+

@@ -4,7 +4,7 @@
 
 Proyecto Final · Procesos Estocásticos (603504) · Universidad de los Llanos · Ingeniería de Sistemas
 
-> **Estado:** la primera entrega cubre el modo **2D**. El modo 3D (esfera) llega en la segunda entrega.
+> **Estado:** funcionan los dos modos: **2D** (lienzo plano) y **3D** (esfera que se gira y se acerca).
 
 ---
 
@@ -80,8 +80,6 @@ flowchart LR
 
 Cada ventana tiene el **lienzo a la izquierda** y el **ranking de letras a la derecha**, con botones para limpiar y reiniciar.
 
-En esta entrega **solo funciona el modo 2D**. El botón «Esfera 3D» abre una vista vacía, con la barra superior para volver.
-
 La ventana 2D tiene:
 
 - **Lienzo** con las cuatro líneas guía (ascendente, altura x, línea base y descendente), en las mismas proporciones que Glifo Capture.
@@ -89,6 +87,15 @@ La ventana 2D tiene:
 - **Ranking** de P(c | O₁:ₜ): las 4 letras más probables y el resto agrupado.
 - **«Trazo no definido»** cuando el trazo no se parece a ninguna letra. En ese caso no se dibuja proyección.
 - **«Guía de letras»**: muestra cómo se dibuja cada letra y en cuántos trazos, según el dataset.
+
+La ventana 3D tiene la misma estructura, con una **esfera** como lienzo:
+
+- **Controles:** clic izquierdo dibuja, clic derecho (o el botón del medio) gira la esfera, la rueda acerca o aleja. «Centrar vista» la devuelve a como empezó, sin borrar.
+- **«Arriba» es siempre el borde superior del panel**, gire como gire la esfera. Las líneas guía se quedan fijas en pantalla.
+- **Solo cuenta la cara que se ve.** Si se gira y parte de la letra queda detrás, esa parte se ignora mientras no se vea.
+- Los puntos se pasan a **coordenadas esféricas (θ, φ)** y los símbolos salen de las variaciones (Δθ, Δφ) sobre la superficie (ver `docs/contrato_features.md`).
+- La **proyección punteada** se dibuja pegada a la superficie y gira con la esfera.
+- Usa **sus propios modelos**, entrenados con un dataset 3D sintético hecho a partir del 2D (ver «Modo 3D» más abajo).
 
 Atajo: `Esc` vuelve al menú.
 
@@ -102,6 +109,7 @@ Atajo: `Esc` vuelve al menú.
 | **Extractor, datos y pruebas** | Solo usan la librería estándar de Python |
 | **HMMEngine** | Usa NumPy (ver `requirements.txt`) |
 | **GUI** | PySide6 (Qt 6). Las fuentes van incluidas en `assets/fonts` |
+| **Esfera 3D** | OpenGL 2.1 o superior, con las clases de Qt (no hay que instalar nada más). En Windows, si la tarjeta no tiene OpenGL, Qt usa su renderizador por software |
 
 ```bash
 pip install -r requirements.txt
@@ -121,7 +129,7 @@ Todos los comandos se lanzan **desde la raíz del proyecto**.
 python GUI.py
 ```
 
-Al abrir el modo 2D se cargan los modelos de `data/modelos_letras_entrenados.json`.
+Al abrir el modo 2D se cargan los modelos de `data/modelos_letras_entrenados.json`. Los del modo 3D (`data/modelos_letras_3d.json`) se cargan la primera vez que se entra a la esfera; tarda unos segundos.
 
 ### Entrenar los modelos HMM
 
@@ -130,6 +138,19 @@ python training/entrenar_hmms.py
 ```
 
 Entrena con Baum-Welch los 27 modelos a partir de `data/secuencias_2d_k8.json` y los guarda en `data/modelos_letras_entrenados.json`.
+
+### Modo 3D: dataset sintético y modelos
+
+Solo hay dataset 2D, así que el del modo 3D se fabrica a partir de él:
+
+```bash
+python training/build_sequences_3d.py          # pega cada muestra 2D sobre la esfera -> data/secuencias_3d_k8.json
+python training/entrenar_hmms.py --modo 3d     # entrena los 27 modelos 3D -> data/modelos_letras_3d.json
+```
+
+Cada muestra se pega varias veces sobre la cara visible de la esfera, con posición, tamaño (±30 %) y giro (±8°) al azar, enrollando el lienzo sobre la superficie con el mapa exponencial. El reparto entrenamiento/prueba es **por muestra** y se hace antes de pegarlas: ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otro lugar de la esfera.
+
+Acierto sobre la prueba 3D (996 secuencias): **91.6 %** con los modelos 3D y 92.4 % si se usan los modelos 2D. La diferencia está dentro del ruido (±0.9 puntos): con el dataset de un diseño por letra, los modelos 2D ya toleran bien la deformación de la curvatura. Con el dataset anterior, más chico, los modelos 3D sí ganaban (87.8 % contra 85.6 %).
 
 ### Pruebas
 
@@ -164,35 +185,43 @@ Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.j
 Glifo/
 ├── GUI.py                        # Punto de entrada: python GUI.py
 ├── src/
-│   ├── FeatureExtractor.py       # Chain Code, remuestreo, símbolos <-> puntos
+│   ├── FeatureExtractor.py       # Chain Code, remuestreo, símbolos <-> puntos, coordenadas esféricas
 │   ├── HMMEngine.py              # Forward, Backward, Baum-Welch, Viterbi, clasificación y proyección
 │   └── gui/                      # Interfaz (PySide6)
 │       ├── main_window.py        # Secciones: menú, 2D y 3D
 │       ├── menu_view.py          # Ventana A: menú principal
 │       ├── view_2d.py            # Ventana B: reconocedor 2D
-│       ├── view_3d.py            # Ventana C: 3D (vacía en esta entrega)
+│       ├── view_3d.py            # Ventana C: reconocedor 3D (esfera)
 │       ├── canvas_2d.py          # Lienzo con líneas guía y proyección
+│       ├── canvas_3d.py          # Esfera con OpenGL: dibujar, girar, acercar
 │       ├── ranking_panel.py      # Listado de probabilidades
 │       ├── guide_popup.py        # Guía de letras
 │       ├── recognizer.py         # Puente FeatureExtractor + HMMEngine
+│       ├── recognizer_3d.py      # El mismo puente para la esfera (marco de la vista, solo lo visible)
 │       ├── widgets.py            # Componentes visuales compartidos
 │       └── theme.py              # Colores, fuentes y estilos
 ├── training/
 │   ├── dataset.py                # Lector del JSON del dataset
 │   ├── check_data.py             # Revisión de calidad de los datos
 │   ├── build_sequences.py        # Dataset -> secuencias de símbolos
-│   └── entrenar_hmms.py          # Entrena y exporta los 27 modelos HMM
+│   ├── build_sequences_3d.py     # Dataset 2D -> secuencias 3D sintéticas sobre la esfera
+│   └── entrenar_hmms.py          # Entrena y exporta los 27 modelos HMM (--modo 2d | 3d)
 ├── tests/
 │   ├── test_features.py          # Pruebas del extractor
+│   ├── test_features_3d.py       # Pruebas de la geometría esférica
 │   ├── test_dataset.py           # Pruebas del lector y de build_sequences
-│   └── test_recognizer.py        # Pruebas del puente GUI <-> HMM
+│   ├── test_sequences_3d.py      # Pruebas del dataset 3D sintético
+│   ├── test_recognizer.py        # Pruebas del puente GUI <-> HMM
+│   └── test_recognizer_3d.py     # Pruebas del reconocedor 3D
 ├── docs/
 │   └── contrato_features.md      # Contrato entre módulos
 ├── assets/fonts/                 # Selawik, Playwrite AR (a y q) e Inconsolata (OFL)
 ├── data/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
 │   ├── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
-│   └── modelos_letras_entrenados.json  # Modelos HMM que carga la GUI
+│   ├── secuencias_3d_k8.json     # Secuencias 3D sintéticas GENERADAS
+│   ├── modelos_letras_entrenados.json  # Modelos HMM del modo 2D
+│   └── modelos_letras_3d.json    # Modelos HMM del modo 3D
 ├── requirements.txt
 ├── .gitattributes                # Finales de línea LF
 └── .gitignore
