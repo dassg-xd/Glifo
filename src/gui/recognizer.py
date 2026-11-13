@@ -59,7 +59,48 @@ PESO_FINAL = 0.2
 PESO_LARGO = 2.0
 UMBRAL_POR_DEFECTO = -1.6
 ESCALA_MIN, ESCALA_MAX = 0.75, 1.33
+DTW_ESTIRAR = 0.5   # penalización por paso no diagonal en alinear_dtw
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
+
+
+def alinear_dtw(usuario, plantilla) -> tuple[int, list]:
+    """DTW de final abierto entre los símbolos del usuario (una letra a medias) y los de la
+    plantilla (la letra completa): cuánto de la plantilla cubre lo dibujado.
+
+    Costo entre dos símbolos = diferencia angular en sectores (0 a K/2), más DTW_ESTIRAR
+    por cada paso que no avanza en las dos secuencias a la vez (sin esa penalización, una
+    racha de símbolos iguales se «apila» gratis sobre un solo símbolo de la plantilla y el
+    final queda atrasado). Se alinea TODO lo del usuario con un PREFIJO de la plantilla;
+    el final τ es el que minimiza el costo acumulado por paso. Devuelve (τ, camino) con el camino como pares (j_usuario, i_plantilla).
+
+    No usa los estados de Viterbi porque estados vecinos pueden emitir lo mismo (en la «n»,
+    el regreso por el palito ↑ se reparte entre dos estados) y para una letra a medias la
+    ruta se queda en el primero: la alineación se atascaba."""
+    u, p = list(usuario), list(plantilla)
+    n, m = len(u), len(p)
+    if n == 0 or m == 0:
+        return 0, []
+    k = 8
+    D = np.full((n + 1, m + 1), np.inf)
+    D[0, 0] = 0.0
+    for j in range(1, n + 1):
+        for i in range(1, m + 1):
+            d = abs(u[j - 1] - p[i - 1]) % k
+            costo = min(d, k - d)
+            D[j, i] = costo + min(D[j - 1, i - 1], D[j - 1, i] + DTW_ESTIRAR, D[j, i - 1] + DTW_ESTIRAR)
+    finales = D[n, 1:] / (n + np.arange(1, m + 1))
+    tau = int(np.argmin(finales))
+    camino, j, i = [], n, tau + 1
+    while j > 0 and i > 0:
+        camino.append((j - 1, i - 1))
+        paso = np.argmin([D[j - 1, i - 1], D[j - 1, i] + DTW_ESTIRAR, D[j, i - 1] + DTW_ESTIRAR])
+        if paso == 0:
+            j, i = j - 1, i - 1
+        elif paso == 1:
+            j -= 1
+        else:
+            i -= 1
+    return tau, camino[::-1]
 
 
 def es_secundario_previo(terminado, actual) -> bool:
@@ -205,26 +246,21 @@ class Reconocedor:
 
     def _alinear(self, simbolos, letra: str, plantilla: Plantilla):
         """(τ, escala) o None. τ es el símbolo de la plantilla alineado con el último del
-        usuario (por los estados de Viterbi) y la escala, cuánto más grande o pequeña
-        está dibujando la letra. None si a la plantilla ya no le queda nada."""
-        m = self.motor.modelos[letra]
-        ruta_usuario, _ = self.motor.viterbi_log(m["pi"], m["A"], m["B"], simbolos)
-        estado = int(ruta_usuario[-1])
-        en_estado = int(np.sum(np.cumprod((ruta_usuario[::-1] == estado).astype(int))))
-        indices = np.nonzero(plantilla.ruta >= estado)[0]
-        if len(indices) == 0:
-            return None
-        inicio = int(indices[0])
-        fin_estado = int(np.nonzero(plantilla.ruta == estado)[0][-1]) if np.any(plantilla.ruta == estado) else inicio
-        tau = min(fin_estado, inicio + en_estado - 1)
-        # Con un estado por símbolo (letras cortas como la «i»), la ruta del usuario puede
-        # caer en el último estado antes de tiempo; nunca se va más allá de lo dibujado.
-        tau = min(tau, len(simbolos) - 1)
+        usuario y la escala, cuánto más grande o pequeña está dibujando la letra. None si a
+        la plantilla ya no le queda nada. La alineación es un DTW de final abierto (ver
+        `alinear_dtw`)."""
+        tau, _ = self._dtw(simbolos, letra, plantilla)
         if tau + 1 >= len(plantilla.segmentos):
             return None
         # Cada símbolo es un paso fijo de remuestreo, así que el cociente entre los
         # símbolos del usuario y los de la plantilla hasta τ estima el tamaño relativo.
         return tau, min(ESCALA_MAX, max(ESCALA_MIN, len(simbolos) / (tau + 1)))
+
+    def _dtw(self, simbolos, letra: str, plantilla: Plantilla):
+        clave = (tuple(simbolos), letra)
+        if getattr(self, "_dtw_clave", None) != clave:
+            self._dtw_clave, self._dtw_valor = clave, alinear_dtw(simbolos, plantilla.simbolos)
+        return self._dtw_valor
 
     def _proyectar(self, simbolos, letra: str, cursor) -> list:
         """Tramos [(x, y)...] con lo que le falta a la letra, desde el cursor."""
