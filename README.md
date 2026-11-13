@@ -83,10 +83,10 @@ Cada ventana tiene el **lienzo a la izquierda** y el **ranking de letras a la de
 La ventana 2D tiene:
 
 - **Lienzo** con las cuatro líneas guía (ascendente, altura x, línea base y descendente), en las mismas proporciones que Glifo Capture.
-- **Proyección punteada** de la letra más probable, que se actualiza con cada símbolo nuevo.
+- **Proyección punteada** de lo que le falta a la letra más probable, que se actualiza con cada símbolo nuevo. Se ajusta a lo que ya dibujaste: arranca en el cursor y termina donde le corresponde a TU letra (su tamaño y su línea base).
 - **Ranking** de P(c | O₁:ₜ): las 4 letras más probables y el resto agrupado.
 - **«Trazo no definido»** cuando el trazo no se parece a ninguna letra. En ese caso no se dibuja proyección.
-- **«Guía de letras»**: muestra cómo se dibuja cada letra y en cuántos trazos, según el dataset.
+- **«Guía de letras»**: anima cada letra trazo por trazo, en orden y con sus números, como la guía de Glifo Capture. Es el diseño del propio dataset (ver «La guía de dibujo» más abajo).
 
 La ventana 3D tiene la misma estructura, con una **esfera** como lienzo:
 
@@ -150,7 +150,27 @@ python training/entrenar_hmms.py --modo 3d     # entrena los 27 modelos 3D -> da
 
 Cada muestra se pega varias veces sobre la cara visible de la esfera, con posición, tamaño (±30 %) y giro (±8°) al azar, enrollando el lienzo sobre la superficie con el mapa exponencial. El reparto entrenamiento/prueba es **por muestra** y se hace antes de pegarlas: ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otro lugar de la esfera.
 
-Acierto sobre la prueba 3D (996 secuencias): **91.6 %** con los modelos 3D y 92.4 % si se usan los modelos 2D. La diferencia está dentro del ruido (±0.9 puntos): con el dataset de un diseño por letra, los modelos 2D ya toleran bien la deformación de la curvatura. Con el dataset anterior, más chico, los modelos 3D sí ganaban (87.8 % contra 85.6 %).
+Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **91.6 %** solo con el HMM y **93.1 %** con el término de largo que usa la app (ver «Cómo decide la letra»). Los modelos 2D sobre esa misma prueba dan 92.4 % solo con el HMM: con el dataset de un diseño por letra ya toleran bien la curvatura. Con el dataset anterior, más chico, los modelos 3D sí ganaban (87.8 % contra 85.6 %).
+
+### La guía de dibujo
+
+```bash
+python training/generar_guia.py                          # -> data/guia_trazos.json (la usa la app)
+python training/generar_guia.py --js ../Glifo-Capture-Pages/docs/guia.js   # además, la de Glifo Capture
+```
+
+La guía sale **del dataset**: cada trazo es el trazo mediano de todas las muestras de la letra (remuestreadas por longitud de arco), suavizado con curvas de Bézier. Así enseña exactamente el diseño con el que aprenden los modelos. Con la guía hecha a mano, que no coincidía con el dataset en la «x», la «k», la «d», la «p» o la «y», quien la seguía tenía 85.6 % de acierto; con la generada, 98.6 % en 2D y 99.5 % en 3D. **Volver a generarla cada vez que cambie el dataset** (`tests/test_guia.py` avisa si quedó desactualizada).
+
+### Cómo decide la letra
+
+Mientras se dibuja se compara la probabilidad de que el trazo sea el **comienzo** de cada letra. Al levantar el lápiz se suman dos términos (ver `HMMEngine.classify`), con pesos elegidos sobre las secuencias de **entrenamiento**:
+
+| Término | Peso | Para qué |
+|---|---|---|
+| El modelo termina en su último estado, log α_T(N) | 0.2 | Que una letra terminada no se confunda con el comienzo de otra más larga |
+| El largo de la secuencia, log N(T; media, desviación de la letra) | 2 | El HMM modela mal las duraciones: sin esto, la «n» absorbía el palito largo de la «h» |
+
+Acierto sobre el 20 % de prueba (2D): 90.6 % sin estos términos, 93.8 % con el primero y **95.8 %** con los dos. Se probó también entrenar con copias deformadas (aumento de datos) y empeoró (92.0 %), así que no se usa.
 
 ### Pruebas
 
@@ -195,7 +215,8 @@ Glifo/
 │       ├── canvas_2d.py          # Lienzo con líneas guía y proyección
 │       ├── canvas_3d.py          # Esfera con OpenGL: dibujar, girar, acercar
 │       ├── ranking_panel.py      # Listado de probabilidades
-│       ├── guide_popup.py        # Guía de letras
+│       ├── guide_popup.py        # Guía de letras (animada)
+│       ├── guia_trazos.py        # Lee la guía de dibujo y la convierte en puntos
 │       ├── recognizer.py         # Puente FeatureExtractor + HMMEngine
 │       ├── recognizer_3d.py      # El mismo puente para la esfera (marco de la vista, solo lo visible)
 │       ├── widgets.py            # Componentes visuales compartidos
@@ -205,6 +226,7 @@ Glifo/
 │   ├── check_data.py             # Revisión de calidad de los datos
 │   ├── build_sequences.py        # Dataset -> secuencias de símbolos
 │   ├── build_sequences_3d.py     # Dataset 2D -> secuencias 3D sintéticas sobre la esfera
+│   ├── generar_guia.py           # Guía de dibujo a partir del dataset (trazo mediano por letra)
 │   └── entrenar_hmms.py          # Entrena y exporta los 27 modelos HMM (--modo 2d | 3d)
 ├── tests/
 │   ├── test_features.py          # Pruebas del extractor
@@ -212,7 +234,8 @@ Glifo/
 │   ├── test_dataset.py           # Pruebas del lector y de build_sequences
 │   ├── test_sequences_3d.py      # Pruebas del dataset 3D sintético
 │   ├── test_recognizer.py        # Pruebas del puente GUI <-> HMM
-│   └── test_recognizer_3d.py     # Pruebas del reconocedor 3D
+│   ├── test_recognizer_3d.py     # Pruebas del reconocedor 3D
+│   └── test_guia.py              # Quien sigue la guía es reconocido
 ├── docs/
 │   └── contrato_features.md      # Contrato entre módulos
 ├── assets/fonts/                 # Selawik, Playwrite AR (a y q) e Inconsolata (OFL)
@@ -220,6 +243,7 @@ Glifo/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
 │   ├── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
 │   ├── secuencias_3d_k8.json     # Secuencias 3D sintéticas GENERADAS
+│   ├── guia_trazos.json          # Guía de dibujo GENERADA del dataset
 │   ├── modelos_letras_entrenados.json  # Modelos HMM del modo 2D
 │   └── modelos_letras_3d.json    # Modelos HMM del modo 3D
 ├── requirements.txt
