@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "training"))
 
-from build_sequences_3d import colocacion_al_azar, pegar_en_esfera, repartir_muestras  # noqa: E402
-from src.FeatureExtractor import ANGULO_LIENZO, FeatureExtractor, angulo_entre, de_esfericas  # noqa: E402
+from build_sequences_3d import colocacion_al_azar, repartir_muestras  # noqa: E402
+from src.FeatureExtractor import ANGULO_LIENZO, FeatureExtractor, angulo_entre, de_esfericas, pegar_en_esfera  # noqa: E402
 
 
 def ele():

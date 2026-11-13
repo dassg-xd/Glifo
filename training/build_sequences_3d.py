@@ -56,40 +56,13 @@ from src.FeatureExtractor import (  # noqa: E402
     DEFAULT_SMOOTH_PASSES,
     VALID_K,
     FeatureExtractor,
-    base_local,
-    de_esfericas,
+    pegar_en_esfera,
 )
 
-CENTRO_LIENZO = (0.5, 0.5)
 RANGO_THETA = 0.35
 RANGO_PHI = 0.30
 RANGO_ESCALA = (0.7, 1.3)
 RANGO_GIRO = math.radians(8)
-
-
-def pegar_en_esfera(trazos, theta0: float, phi0: float, lado: float, giro: float = 0.0) -> list:
-    """Trazos 2D normalizados (0..1, y hacia abajo) -> trazos (x, y, z) sobre la esfera.
-
-    El centro del lienzo cae en (θ0, φ0) y su lado mide `lado` radianes.
-    """
-    c = de_esfericas(theta0, phi0)
-    e, n = base_local(c)
-    cg, sg = math.cos(giro), math.sin(giro)
-    salida = []
-    for trazo in trazos:
-        nuevo = []
-        for x, y in trazo:
-            u = (x - CENTRO_LIENZO[0]) * lado
-            w = -(y - CENTRO_LIENZO[1]) * lado            # en pantalla la y crece hacia abajo
-            u, w = cg * u - sg * w, sg * u + cg * w
-            r = math.hypot(u, w)
-            if r < 1e-12:
-                nuevo.append(c)
-                continue
-            d = tuple((u * e[i] + w * n[i]) / r for i in range(3))
-            nuevo.append(tuple(math.cos(r) * c[i] + math.sin(r) * d[i] for i in range(3)))
-        salida.append(nuevo)
-    return salida
 
 
 def colocacion_al_azar(rng: random.Random) -> tuple:

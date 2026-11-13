@@ -304,6 +304,35 @@ def _largo3(t: Sequence[Sequence[float]]) -> float:
     return sum(angulo_entre(a, b) for a, b in zip(t, t[1:]))
 
 
+def pegar_en_esfera(trazos, theta0: float, phi0: float, lado: float, giro: float = 0.0) -> list:
+    """Trazos 2D normalizados (0..1, y hacia abajo) -> trazos (x, y, z) sobre la esfera.
+
+    El centro del lienzo cae en (θ0, φ0) del marco de la vista y su lado mide `lado`
+    radianes. Se enrolla con el mapa exponencial: un punto a distancia r del centro
+    del lienzo, en dirección d, cae a un ángulo r de ese centro sobre el círculo
+    máximo con esa dirección. Lo usan el dataset 3D sintético y las plantillas de
+    la proyección 3D.
+    """
+    c = de_esfericas(theta0, phi0)
+    e, n = base_local(c)
+    cg, sg = math.cos(giro), math.sin(giro)
+    salida = []
+    for trazo in trazos:
+        nuevo = []
+        for x, y in trazo:
+            u = (x - 0.5) * lado
+            w = -(y - 0.5) * lado            # en pantalla la y crece hacia abajo
+            u, w = cg * u - sg * w, sg * u + cg * w
+            r = math.hypot(u, w)
+            if r < 1e-12:
+                nuevo.append(c)
+                continue
+            d = tuple((u * e[i] + w * n[i]) / r for i in range(3))
+            nuevo.append(tuple(math.cos(r) * c[i] + math.sin(r) * d[i] for i in range(3)))
+        salida.append(nuevo)
+    return salida
+
+
 # ---------------------------------------------------------------------------
 # Clase principal
 # ---------------------------------------------------------------------------
