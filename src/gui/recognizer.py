@@ -52,6 +52,14 @@ UMBRAL_POR_DEFECTO = -1.6
 ESCALA_MIN, ESCALA_MAX = 0.75, 1.33
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
 
+def es_secundario_previo(terminado, actual) -> bool:
+    """¿Un trazo ya terminado debe esperar al lápiz arriba mientras se dibuja `actual`?
+    Sí si es muy corto o si queda entero por encima del trazo en curso (la y crece
+    hacia abajo): así un punto o una virgulilla hechos antes que el cuerpo no se
+    mezclan con la letra a medias."""
+    largo = sum(math.dist(a, b) for a, b in zip(terminado, terminado[1:]))
+    return largo < LARGO_SECUNDARIO or max(p[1] for p in terminado) < min(p[1] for p in actual)
+
 
 @dataclass
 class Resultado:
@@ -213,12 +221,11 @@ class Reconocedor:
             # trazo en curso (p. ej. la virgulilla hecha antes que la «n») todavía no se
             # tienen en cuenta: la secuencia «n a medias + salto + virgulilla» no existe
             # en el entrenamiento. Al levantar el lápiz entran en su lugar.
-            # En el dataset los trazos secundarios miden como mucho ~0.20 del lienzo y
-            # los principales desde ~0.21: los trazos terminados más cortos que
-            # LARGO_SECUNDARIO esperan al lápiz arriba. El trazo en curso siempre cuenta.
-            def largo(t):
-                return sum(math.dist(a, b) for a, b in zip(t, t[1:]))
-            terminados = [t for t in trazos[:-1] if largo(t) >= LARGO_SECUNDARIO]
+            # Esperan al lápiz arriba los trazos terminados muy cortos (un punto) y los que
+            # quedan enteros POR ENCIMA del trazo en curso (punto, virgulilla). El largo solo
+            # no basta: en el dataset de un diseño por letra la virgulilla mide ~0.26, tanto
+            # como un trazo principal corto. El trazo en curso siempre cuenta.
+            terminados = [t for t in trazos[:-1] if not es_secundario_previo(t, trazos[-1])]
             # Los terminados van en orden canónico y el trazo en curso al final, que es
             # donde está el cursor y desde donde se proyecta lo que falta.
             trazos = self.extractor.ordenar_trazos(terminados) + [trazos[-1]]
