@@ -34,7 +34,6 @@ from . import theme as T
 ZOOM_MIN, ZOOM_MAX = 0.6, 3.0
 RADIO_RELATIVO = 0.44          # radio de la esfera (zoom 1) como fracción del lado menor del lienzo
 DISTANCIA_MINIMA = 0.002       # radianes: filtra eventos repetidos del ratón
-SENSIBILIDAD_GIRO = 0.008      # radianes por píxel arrastrado
 PASO_MALLA = 15                # grados entre meridianos y entre paralelos
 ELEVACION = 1.002              # la malla se dibuja apenas por encima de la superficie
 
@@ -210,9 +209,11 @@ class Lienzo3D(QOpenGLWidget):
         if self._girando_desde is not None:
             d = ev.position() - self._girando_desde
             self._girando_desde = ev.position()
-            # Arrastrar a la derecha gira alrededor del eje vertical de la vista; hacia abajo,
-            # alrededor del horizontal. Se aplica en el marco de la vista (multiplica por la izquierda).
-            giro = _rot("y", d.x() * SENSIBILIDAD_GIRO) @ _rot("x", d.y() * SENSIBILIDAD_GIRO)
+            # La esfera «rueda» bajo el ratón: arrastrar un radio gira un radián. A la derecha
+            # gira alrededor del eje vertical de la vista; hacia abajo, del horizontal. Se aplica
+            # en el marco de la vista (multiplica por la izquierda).
+            k = 1.0 / self.radio()
+            giro = _rot("y", d.x() * k) @ _rot("x", d.y() * k)
             self.rotacion = giro @ self.rotacion
             self.update()
             self.trazos_cambiaron.emit()        # lo que se ve cambió: se vuelve a analizar
