@@ -11,10 +11,10 @@ la ventana 2D necesita mostrar:
 2. HMMEngine.classify: P(c | O_1:t) para las 27 letras, con escalado de
    temperatura (T = 3). Mientras el lápiz está abajo se usa la probabilidad de
    ser el comienzo de cada letra; al levantarlo, la de que la letra termine ahí.
-3. Proyección con la trayectoria aprendida (ver `Plantilla`): la muestra de
-   entrenamiento que el modelo de la letra ganadora considera más típica se
-   alinea con el trazo del usuario por Viterbi, y se dibuja lo que le falta
-   desde el cursor, con los saltos del lápiz como espacios.
+3. Proyección con la trayectoria aprendida (ver `Plantilla`): el prototipo de
+   la guía de dibujo (el trazo mediano del dataset) se alinea con el trazo del
+   usuario por Viterbi, y se dibuja lo que le falta desde el cursor, con los
+   saltos del lápiz como espacios.
 4. «Trazo no definido»: si la verosimilitud por símbolo de la letra ganadora,
    log P(O_1:t | λ_ĉ) / t, queda por debajo del umbral, el trazo no se parece a
    ninguna letra. La probabilidad a posteriori no sirve para esto: al
@@ -85,10 +85,11 @@ class Resultado:
 class Plantilla:
     """Trayectoria aprendida de una letra.
 
-    Es la muestra del dataset con mayor verosimilitud por símbolo bajo el modelo
-    de su letra (la más típica según λ_c), entre las de largo intermedio. Por
-    cada símbolo guarda el segmento real que lo produjo y si fue un salto del
-    lápiz, y la ruta de estados de Viterbi que la alinea con el modelo.
+    Es el prototipo de la guía de dibujo (el trazo mediano de todas las muestras
+    de la letra) o, si falta, la muestra del dataset con mayor verosimilitud por
+    símbolo bajo el modelo de su letra. Por cada símbolo guarda el segmento que
+    lo produjo y si fue un salto del lápiz, y la ruta de estados de Viterbi que
+    la alinea con el modelo.
     """
     simbolos: list
     segmentos: list          # [((x0, y0), (x1, y1), es_salto)], uno por símbolo
@@ -155,16 +156,32 @@ class Reconocedor:
         return fx.extract_trazos(trazos), segmentos
 
     def _construir_plantillas(self, carpeta) -> dict:
+        """Una plantilla por letra. Primero el prototipo de la guía de dibujo (el trazo
+        mediano del dataset, limpio: data/guia_trazos.json); si falta, la muestra del
+        dataset que el modelo considera más típica."""
+        plantillas = {}
+        try:
+            from src.gui.guia_trazos import GUIA, trazos_de_letra
+        except (OSError, ValueError, KeyError):
+            GUIA = {}
+        for letra in self.motor.modelos:
+            if letra not in GUIA:
+                continue
+            simbolos, segmentos = self._segmentos(trazos_de_letra(letra))
+            if len(simbolos) < MIN_SIMBOLOS or len(simbolos) != len(segmentos):
+                continue
+            modelo = self.motor.modelos[letra]
+            ruta, _ = self.motor.viterbi_log(modelo["pi"], modelo["A"], modelo["B"], simbolos, terminar_en_final=True)
+            plantillas[letra] = Plantilla(simbolos, segmentos, ruta)
         if not carpeta:
-            return {}
+            return plantillas
         candidatos = sorted(Path(carpeta).glob("glifo-dataset-*.json"))
         if not candidatos:
-            return {}
+            return plantillas
         with open(candidatos[-1], encoding="utf-8") as f:
             crudo = json.load(f)
-        plantillas = {}
         for letra, muestras in crudo.items():
-            if letra not in self.motor.modelos:
+            if letra not in self.motor.modelos or letra in plantillas:
                 continue
             modelo = self.motor.modelos[letra]
             opciones = []
