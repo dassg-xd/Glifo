@@ -8,7 +8,7 @@ con los botones de cada vista.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow, QStackedWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QStackedWidget
 
 from .menu_view import VistaMenu
 from .recognizer import Reconocedor
@@ -41,13 +41,36 @@ class VentanaPrincipal(QMainWindow):
 
     def ir_al_menu(self):
         self.vista_2d.capa_guia.ocultar()
+        self.vista_3d.capa_guia.ocultar()
         self.secciones.setCurrentWidget(self.menu)
 
     def ir_a_modo(self, modo: str):
         self.vista_2d.capa_guia.ocultar()
+        self.vista_3d.capa_guia.ocultar()
+        if modo == "3D" and not self._cargar_reconocedor_3d():
+            return
         vista = self.vista_2d if modo == "2D" else self.vista_3d
         vista.barra.fijar_modo(modo)
         self.secciones.setCurrentWidget(vista)
+
+    def _cargar_reconocedor_3d(self) -> bool:
+        """El reconocedor 3D se carga la primera vez que se entra al modo (unos segundos)."""
+        if self.vista_3d.reconocedor is not None:
+            return True
+        from .recognizer_3d import RUTA_MODELOS_3D, Reconocedor3D
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            self.vista_3d.fijar_reconocedor(Reconocedor3D())
+            return True
+        except (OSError, ValueError, KeyError) as error:
+            QMessageBox.critical(
+                self, "Glifo",
+                f"No se pudieron cargar los modelos 3D desde\n{RUTA_MODELOS_3D}\n\n{error}\n\n"
+                "Genéralos con:\n  python training/build_sequences_3d.py\n  python training/entrenar_hmms.py --modo 3d",
+            )
+            return False
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def keyPressEvent(self, ev):
         # Atajo: Esc vuelve al menú desde cualquier modo.
