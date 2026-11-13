@@ -191,6 +191,14 @@ class Lienzo2D(QWidget):
         p.setPen(pluma)
         p.setBrush(Qt.BrushStyle.NoBrush)
         for tramo in self.proyeccion:
+            if all(abs(q[0] - tramo[0][0]) + abs(q[1] - tramo[0][1]) < 1e-6 for q in tramo):
+                # Un punto (el de la «i»): con la línea punteada no se vería.
+                p.save()
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(T.color(T.TEAL_TRAZO))
+                p.drawEllipse(self._a_pantalla(tramo[0]), 4.5, 4.5)
+                p.restore()
+                continue
             camino = QPainterPath(self._a_pantalla(tramo[0]))
             for q in tramo[1:]:
                 camino.lineTo(self._a_pantalla(q))

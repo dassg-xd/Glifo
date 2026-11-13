@@ -408,7 +408,14 @@ class Lienzo3D(QOpenGLWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
         for tramo in self.proyeccion:
             for camino in self._caminos_visibles(tramo):
-                if len(camino) > 1:
+                if all(abs(q.x() - camino[0].x()) + abs(q.y() - camino[0].y()) < 0.5 for q in camino):
+                    # Un punto (el de la «i»): con la línea punteada no se vería.
+                    p.save()
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(T.color(T.TEAL_TRAZO))
+                    p.drawEllipse(camino[0], 4.5, 4.5)
+                    p.restore()
+                elif len(camino) > 1:
                     self._trazar(p, camino)
 
     def _dibujar_cursor(self, p: QPainter):
