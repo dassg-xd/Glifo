@@ -250,7 +250,7 @@ class PanelGuia(QFrame):
         titulos = QVBoxLayout()
         titulos.setSpacing(4)
         titulos.addWidget(etiqueta("Cómo se dibuja cada letra", 18, T.TINTA, True))
-        titulos.addWidget(etiqueta("Sigue el orden de los números: es la misma guía de Glifo Capture.", 13, T.APAGADO))
+        titulos.addWidget(etiqueta("Sigue el orden de los números y levanta el lápiz entre un trazo y otro.", 13, T.APAGADO))
         cabecera.addLayout(titulos, 1)
         x = QPushButton("✕")
         x.setFixedSize(32, 32)
