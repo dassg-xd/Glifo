@@ -59,7 +59,13 @@ PESO_FINAL = 0.2
 PESO_LARGO = 2.0
 UMBRAL_POR_DEFECTO = -1.6
 ESCALA_MIN, ESCALA_MAX = 0.75, 1.33
-DTW_ESTIRAR = 0.5   # penalización por paso no diagonal en alinear_dtw
+# Ajuste de la plantilla al dibujo del usuario (ver `_ajustar`): mínimo de puntos
+# emparejados, rango de escala permitido y en qué fracción del alto de la letra la
+# proyección pasa de arrancar en el cursor a la posición ajustada.
+AJUSTE_MIN_PUNTOS = 4
+DTW_ESTIRAR = 0.5
+AJUSTE_ESCALA = (0.6, 1.8)
+TRANSICION = 0.25
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
 
 
@@ -262,8 +268,47 @@ class Reconocedor:
             self._dtw_clave, self._dtw_valor = clave, alinear_dtw(simbolos, plantilla.simbolos)
         return self._dtw_valor
 
-    def _proyectar(self, simbolos, letra: str, cursor) -> list:
-        """Tramos [(x, y)...] con lo que le falta a la letra, desde el cursor."""
+    # Coordenadas del plano en el que se ajusta y se dibuja la proyección. En 2D es el
+    # lienzo; el modo 3D las cambia por lo que se ve en pantalla (ver Reconocedor3D).
+    def _plano(self, p) -> tuple:
+        return (float(p[0]), float(p[1]))
+
+    def _desde_plano(self, q):
+        return (float(q[0]), float(q[1]))
+
+    def _ajustar(self, simbolos, segmentos_usuario, letra: str, plantilla: Plantilla, tau: int,
+                 escala_base: float = 1.0):
+        """Escala s y traslación t que mejor llevan la plantilla sobre lo que ya dibujó el
+        usuario (mínimos cuadrados), o None si no hay con qué ajustar.
+
+        Los pares de puntos (usuario, plantilla) salen del camino del DTW. Con ellos,
+        s = Σ(T−T̄)·(U−Ū) / Σ|T−T̄|² y t = Ū − s·T̄. No hay giro: arriba siempre es arriba."""
+        if len(segmentos_usuario) != len(simbolos):
+            return None
+        _, camino = self._dtw(simbolos, letra, plantilla)
+        pares = [(self._plano(plantilla.segmentos[i][1]), self._plano(segmentos_usuario[j][1]))
+                 for j, i in camino
+                 if not segmentos_usuario[j][2] and not plantilla.segmentos[i][2]]   # los saltos no son tinta
+        if len(pares) < AJUSTE_MIN_PUNTOS:
+            return None
+        T = np.array([a for a, _ in pares])
+        U = np.array([b for _, b in pares])
+        dT = T - T.mean(axis=0)
+        var = float((dT ** 2).sum())
+        if var < 1e-9:
+            return None
+        s = float((dT * (U - U.mean(axis=0))).sum() / var)
+        s = min(AJUSTE_ESCALA[1] * escala_base, max(AJUSTE_ESCALA[0] * escala_base, s))
+        return s, U.mean(axis=0) - s * T.mean(axis=0)
+
+    def _proyectar(self, simbolos, letra: str, cursor, segmentos_usuario=None, escala_base: float = 1.0) -> list:
+        """Tramos con lo que le falta a la letra, desde el cursor.
+
+        Si se puede, la plantilla se ajusta a lo dibujado (`_ajustar`): lo que falta cae en
+        la posición y el tamaño que corresponden a la letra del usuario (el final de una
+        «n» llega a SU línea base). Para no saltar, el primer tramo arranca en el cursor y
+        se acerca a la posición ajustada durante TRANSICION del alto de la letra. Sin
+        ajuste, lo que falta se pega al cursor con la escala estimada."""
         plantilla = self.plantillas.get(letra)
         if plantilla is None:
             # Sin plantilla: proyección con los símbolos más probables del modelo.
@@ -275,20 +320,47 @@ class Reconocedor:
             return []
         tau, escala = alineacion
         restantes = plantilla.segmentos[tau + 1:]
-        ancla = plantilla.segmentos[tau][1]
+        c = np.array(self._plano(cursor))
+        ajuste = None
+        if segmentos_usuario is not None:
+            ajuste = self._ajustar(simbolos, segmentos_usuario, letra, plantilla, tau, escala_base)
+        if ajuste is None:
+            s, t = escala * escala_base, c - escala * escala_base * np.array(self._plano(plantilla.segmentos[tau][1]))
+            transicion = 0.0
+        else:
+            s, t = ajuste
+            ys = [self._plano(b)[1] for _, b, salto in plantilla.segmentos if not salto]
+            transicion = TRANSICION * s * (max(ys) - min(ys))
 
         def llevar(p):
-            return (cursor[0] + (p[0] - ancla[0]) * escala, cursor[1] + (p[1] - ancla[1]) * escala)
+            return s * np.array(self._plano(p)) + t
 
-        tramos = [[tuple(cursor)]]
+        previo = llevar(plantilla.segmentos[tau][1])
+        delta = c - previo                                     # cuánto hay que correrse para salir del cursor
+        recorrido, primer_tramo = 0.0, True
+        tramos = [[c]]
         for a, b, salto in restantes:
+            q = llevar(b)
             if salto:
-                tramos.append([llevar(b)])          # lápiz arriba: el siguiente tramo empieza en otro lado
-            else:
-                tramos[-1].append(llevar(b))
-        # Un tramo de un solo punto después de levantar el lápiz es un punto (el de la
-        # «i»): se dibuja como un punto en vez de descartarlo.
-        return [t if len(t) > 1 else t * 2 for k, t in enumerate(tramos) if len(t) > 1 or k > 0]
+                primer_tramo = False
+                tramos.append([q])                             # lápiz arriba: el siguiente tramo empieza en otro lado
+                continue
+            if primer_tramo:
+                recorrido += float(np.linalg.norm(q - previo))
+                previo = q
+                w = 1.0 if transicion <= 0 else max(0.0, 1.0 - recorrido / transicion)
+                q = q + w * delta
+            tramos[-1].append(q)
+        salida = []
+        for k, tramo in enumerate(tramos):
+            puntos = [p for p in (self._desde_plano(q) for q in tramo) if p is not None]
+            # Un tramo de un solo punto después de levantar el lápiz es un punto (el de la
+            # «i»): se dibuja como un punto en vez de descartarlo.
+            if len(puntos) > 1:
+                salida.append(puntos)
+            elif len(puntos) == 1 and k > 0:
+                salida.append(puntos * 2)
+        return salida
 
     # ------------------------------------------------------------- principal
     def procesar(self, trazos, dibujando: bool = True) -> Resultado:
@@ -322,7 +394,9 @@ class Reconocedor:
             return Resultado("pocos", simbolos=simbolos)
 
         r = self._evaluar(simbolos, dibujando)
-        proyeccion = [] if r.estado == "no_definido" else self._proyectar(r.simbolos, r.letra, cursor)
+        proyeccion = []
+        if r.estado != "no_definido":
+            proyeccion = self._proyectar(r.simbolos, r.letra, cursor, self._segmentos(trazos)[1])
         return Resultado(r.estado, r.simbolos, r.probabilidades, r.letra, proyeccion, r.verosimilitud)
 
     def _evaluar(self, simbolos, dibujando: bool) -> Resultado:

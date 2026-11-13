@@ -90,6 +90,18 @@ class TestReconocedor3D(unittest.TestCase):
         sin_tilde = self.r.procesar_3d([a_medias], np.eye(3), dibujando=True)
         self.assertEqual(con_tilde.simbolos, sin_tilde.simbolos)
 
+    def test_proyeccion_se_ajusta_a_la_letra_del_usuario(self):
+        from src.gui.guia_trazos import trazos_de_letra
+        n = [[(0.5 + (x - 0.5) * 1.15 + 0.04, 0.56 + (y - 0.56) * 1.15) for x, y in t] for t in trazos_de_letra("n")]
+        vista = pegar_en_esfera(n, 0.1, math.pi / 2 - 0.05, ANGULO_LIENZO)
+        mitad = [vista[0][: len(vista[0]) // 2]]
+        sim = self.r.extractor.extract_trazos(mitad, "3d")
+        pr = self.r._proyectar(sim, "n", mitad[-1][-1], self.r._segmentos_3d(mitad))
+        self.assertLess(angulo_entre(pr[-1][-1], vista[-1][-1]), 0.06)
+        for tramo in pr:
+            for p in tramo:
+                self.assertGreater(p[2], 0.0)                      # todo en la cara visible
+
     def test_vacio(self):
         self.assertEqual(self.r.procesar_3d([], np.eye(3)).estado, "vacio")
 

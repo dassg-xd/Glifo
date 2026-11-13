@@ -25,10 +25,11 @@ mismos símbolos.
 
 Plantillas
 ----------
-Las mismas muestras típicas del 2D, pegadas en el centro de la vista con el
-tamaño de referencia (ANGULO_LIENZO), con sus símbolos esféricos y la ruta de
-Viterbi del modelo 3D. Para proyectar se recorre lo que falta segmento a
-segmento, con su rumbo y su largo, por círculos máximos desde el cursor.
+Los mismos prototipos de la guía que usa el 2D, pegados en el centro de la
+vista con el tamaño de referencia (ANGULO_LIENZO), con sus símbolos esféricos
+y la ruta de Viterbi del modelo 3D. Para proyectar, la plantilla se ajusta
+(escala y traslación) a lo que el usuario ya dibujó, medido en pantalla, y lo
+que falta se levanta a la cara visible de la esfera.
 """
 from __future__ import annotations
 
@@ -44,9 +45,7 @@ from src.FeatureExtractor import (
     _largo3,
     a_esfericas,
     angulo_entre,
-    mover,
     pegar_en_esfera,
-    rumbo,
     visibles,
 )
 from src.gui.recognizer import (
@@ -90,25 +89,18 @@ class Reconocedor3D(Reconocedor):
         return segmentos
 
     # ------------------------------------------------------- proyección
-    def _proyectar_3d(self, simbolos, letra: str, cursor, zoom: float) -> list:
-        """Tramos de puntos en el marco de la VISTA con lo que le falta a la letra."""
-        plantilla = self.plantillas.get(letra)
-        if plantilla is None:
-            return []
-        alineacion = self._alinear(simbolos, letra, plantilla)
-        if alineacion is None:
-            return []
-        tau, escala = alineacion
-        tramos = [[tuple(cursor)]]
-        actual = tuple(cursor)
-        for a, b, salto in plantilla.segmentos[tau + 1:]:
-            actual = mover(actual, rumbo(a, b), angulo_entre(a, b) * escala / zoom)
-            if salto:
-                tramos.append([actual])          # lápiz arriba: el siguiente tramo empieza en otro lado
-            else:
-                tramos[-1].append(actual)
-        # Como en 2D: un tramo de un solo punto tras levantar el lápiz (el de la «i») es un punto.
-        return [t if len(t) > 1 else t * 2 for k, t in enumerate(tramos) if len(t) > 1 or k > 0]
+    def _plano(self, p) -> tuple:
+        """La proyección se ajusta sobre lo que se ve: (x, y) del marco de la vista, que con
+        la proyección ortográfica es exactamente la posición en pantalla."""
+        return (float(p[0]), float(p[1]))
+
+    def _desde_plano(self, q):
+        """(x, y) de pantalla -> punto de la cara visible de la esfera (None si cae afuera)."""
+        x, y = float(q[0]), float(q[1])
+        d = x * x + y * y
+        if d >= 1.0:
+            return None
+        return (x, y, math.sqrt(1.0 - d))
 
     # ------------------------------------------------------------- principal
     def procesar_3d(self, trazos, rotacion, dibujando: bool = True, zoom: float = 1.0) -> Resultado:
@@ -150,6 +142,6 @@ class Reconocedor3D(Reconocedor):
         proyeccion = []
         if r.estado != "no_definido" and cursor[2] > Z_VISIBLE:     # sin cursor a la vista no hay desde dónde proyectar
             Rt = R.T
-            proyeccion = [[tuple(Rt @ np.asarray(p)) for p in tramo]
-                          for tramo in self._proyectar_3d(r.simbolos, r.letra, cursor, zoom)]
+            tramos = self._proyectar(r.simbolos, r.letra, cursor, self._segmentos_3d(vista), escala_base=1.0 / zoom)
+            proyeccion = [[tuple(Rt @ np.asarray(p)) for p in tramo] for tramo in tramos]
         return Resultado(r.estado, r.simbolos, r.probabilidades, r.letra, proyeccion, r.verosimilitud)
