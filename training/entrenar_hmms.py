@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -11,16 +12,28 @@ if str(ROOT) not in sys.path:
 
 from src.HMMEngine import HMMEngine  # noqa: E402
 
+# Archivos de entrada y salida por modo. Los modelos 3D van aparte: el 2D no se toca.
+ARCHIVOS = {
+    "2d": ("secuencias_2d_k8.json", "modelos_letras_entrenados.json"),
+    "3d": ("secuencias_3d_k8.json", "modelos_letras_3d.json"),
+}
+
+
 def main():
-    msg = "Iniciando el pipeline de entrenamiento de HMM..."
+    ap = argparse.ArgumentParser(description="Entrena un HMM por letra con Baum-Welch")
+    ap.add_argument("--modo", choices=sorted(ARCHIVOS), default="2d",
+                    help="2d (lienzo plano) o 3d (esfera, dataset sintético)")
+    args = ap.parse_args()
+    msg = f"Iniciando el pipeline de entrenamiento de HMM ({args.modo.upper()})..."
     print(msg)
     
     # 1. Instanciar el motor estocástico
     motor = HMMEngine()
     
     # 3. Configuración de archivos
-    archivo_entrada = ROOT / 'data' / 'secuencias_2d_k8.json'
-    archivo_salida = ROOT / 'data' / 'modelos_letras_entrenados.json'
+    entrada, salida = ARCHIVOS[args.modo]
+    archivo_entrada = ROOT / 'data' / entrada
+    archivo_salida = ROOT / 'data' / salida
 
     # 2. Estados por letra: 8, salvo en letras de secuencias cortas.
     #    Con 3 a 6 estados las letras quedaban poco detalladas («o», «c» y «s» tenían 3)
