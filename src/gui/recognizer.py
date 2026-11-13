@@ -182,6 +182,9 @@ class Reconocedor:
         inicio = int(indices[0])
         fin_estado = int(np.nonzero(plantilla.ruta == estado)[0][-1]) if np.any(plantilla.ruta == estado) else inicio
         tau = min(fin_estado, inicio + en_estado - 1)       # símbolo de la plantilla alineado con el último del usuario
+        # Con un estado por símbolo (letras cortas como la «i»), la ruta del usuario puede
+        # caer en el último estado antes de tiempo; nunca se va más allá de lo dibujado.
+        tau = min(tau, len(simbolos) - 1)
         restantes = plantilla.segmentos[tau + 1:]
         if not restantes:
             return []
@@ -201,7 +204,9 @@ class Reconocedor:
                 tramos.append([llevar(b)])          # lápiz arriba: el siguiente tramo empieza en otro lado
             else:
                 tramos[-1].append(llevar(b))
-        return [t for t in tramos if len(t) > 1]
+        # Un tramo de un solo punto después de levantar el lápiz es un punto (el de la
+        # «i»): se dibuja como un punto en vez de descartarlo.
+        return [t if len(t) > 1 else t * 2 for k, t in enumerate(tramos) if len(t) > 1 or k > 0]
 
     # ------------------------------------------------------------- principal
     def procesar(self, trazos, dibujando: bool = True) -> Resultado:
