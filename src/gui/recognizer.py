@@ -53,6 +53,10 @@ TEMPERATURA = 3.0
 # diseño por letra: 0.2 dio 92.9 % (1 = solo letra completa: 90.1 %; 0 = solo prefijo:
 # 92.2 %). En el 20 % de prueba: 93.8 %.
 PESO_FINAL = 0.2
+# Al levantar el lápiz, cuánto pesa la probabilidad del largo de la secuencia
+# (ver HMMEngine.classify). Elegido con las secuencias de ENTRENAMIENTO: 2 dio el mejor
+# acierto en 2D y casi el mejor en 3D. En la prueba: 2D 93.8 % -> 95.8 %, 3D 91.6 % -> 93.1 %.
+PESO_LARGO = 2.0
 UMBRAL_POR_DEFECTO = -1.6
 ESCALA_MIN, ESCALA_MAX = 0.75, 1.33
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
@@ -98,6 +102,7 @@ class Reconocedor:
         self.motor.cargar_modelos(str(ruta_modelos))
         self.extractor = FeatureExtractor()
         self.umbral = self._calcular_umbral(ruta_secuencias)
+        self.largos = self._calcular_largos(ruta_secuencias)
         self.plantillas = self._construir_plantillas(carpeta_datos)
         self._cache_clave: tuple | None = None
         self._cache: Resultado | None = None
@@ -120,6 +125,17 @@ class Reconocedor:
             for O in seqs if len(O) >= MIN_SIMBOLOS
         ]
         return float(np.percentile(valores, PERCENTIL_UMBRAL)) if valores else UMBRAL_POR_DEFECTO
+
+    @staticmethod
+    def _calcular_largos(ruta) -> dict:
+        """{letra: (media, desviación)} del largo de las secuencias de entrenamiento. A la
+        desviación se le suma 1 símbolo para no castigar de más a las letras muy regulares."""
+        if not ruta or not Path(ruta).exists():
+            return {}
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+        return {letra: (float(np.mean([len(O) for O in seqs])), float(np.std([len(O) for O in seqs])) + 1.0)
+                for letra, seqs in datos.get("secuencias", {}).items() if seqs}
 
     def reiniciar(self) -> None:
         self._cache_clave = None
@@ -263,7 +279,8 @@ class Reconocedor:
         if clave != self._cache_clave:
             # Solo se recalcula el HMM cuando aparece un símbolo nuevo o se levanta el lápiz.
             letra, probs = self.motor.classify(np.asarray(simbolos, dtype=int), temperatura=TEMPERATURA,
-                                               completa=not dibujando, peso_final=PESO_FINAL)
+                                               completa=not dibujando, peso_final=PESO_FINAL,
+                                               largos=self.largos, peso_largo=PESO_LARGO)
             ordenadas = sorted(((l, float(p)) for l, p in probs.items()), key=lambda x: -x[1])
             vps = self.verosimilitud_por_simbolo(simbolos, letra)
             # «No definido» solo se decide con el lápiz arriba: a mitad de un trazo,
