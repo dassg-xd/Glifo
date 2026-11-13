@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.FeatureExtractor import ALPHABET, ANGULO_LIENZO, pegar_en_esfera  # noqa: E402
-from src.gui.guia_trazos import GUIA, puntos_de_camino, segmentos_de_camino, trazos_de_letra  # noqa: E402
+from src.gui.guia_trazos import GUIA, GUIA_DIBUJO, puntos_de_camino, segmentos_de_camino, trazos_de_letra  # noqa: E402
 from src.gui.recognizer import Reconocedor  # noqa: E402
 from src.gui.recognizer_3d import Reconocedor3D  # noqa: E402
 
@@ -27,6 +27,16 @@ from src.gui.recognizer_3d import Reconocedor3D  # noqa: E402
 class TestCaminos(unittest.TestCase):
     def test_las_27_letras(self):
         self.assertEqual(set(GUIA), set(ALPHABET))
+
+    def test_guia_visible_de_glifo_capture(self):
+        """La «Guía de letras» muestra los trazos hechos a mano de Glifo Capture: las 27 letras,
+        dentro del lienzo y legibles por el mismo lector de caminos."""
+        self.assertEqual(set(GUIA_DIBUJO), set(ALPHABET))
+        for letra, caminos in GUIA_DIBUJO.items():
+            for c in caminos:
+                pts = puntos_de_camino(c)
+                self.assertTrue(pts, letra)
+                self.assertTrue(all(0 <= x <= 1000 and 0 <= y <= 1000 for x, y in pts), letra)
 
     def test_lector_de_caminos(self):
         piezas = segmentos_de_camino("M100 200 L300 200 C350 200 400 250 400 300")
