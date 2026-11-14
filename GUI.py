@@ -1,12 +1,3 @@
-"""
-GUI.py — punto de entrada de Glifo.
-
-    python GUI.py
-
-Abre el menú principal. El modo 2D carga los 27 modelos HMM entrenados
-(data/modelos_letras_entrenados.json) y reconoce la letra mientras se dibuja.
-El modo 3D todavía no tiene contenido.
-"""
 import sys
 
 from PySide6.QtWidgets import QApplication, QMessageBox

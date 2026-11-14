@@ -5,7 +5,7 @@ Convierte el dataset de trazos (JSON del equipo) en secuencias de símbolos
 discretos para entrenar los HMM (Baum-Welch) y evaluarlos.
 
 Uso (desde la raíz del proyecto):
-    python training/build_sequences.py --dataset data/glifo-dataset-2026-11-01.json
+    python training/build_sequences.py --dataset data/glifo-dataset-2026-11-13.json
     python training/build_sequences.py --k 16 --step 0.03 --holdout 0
 
 Salida: data/secuencias_2d_k<K>.json

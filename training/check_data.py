@@ -6,7 +6,7 @@ letra, trazos demasiado cortos o sospechosamente largos, y puntos fuera del
 lienzo (señal de que `--canvas` no coincide con el lienzo de grabación).
 
 Uso (desde la raíz del proyecto):
-    python training/check_data.py --dataset data/glifo-dataset-2026-11-01.json
+    python training/check_data.py --dataset data/glifo-dataset-2026-11-13.json
     python training/check_data.py --meta 50        # exige 50 muestras por letra
 
 La meta por defecto es la del recolector (Glifo Capture): 70 muestras por letra.

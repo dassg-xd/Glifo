@@ -93,16 +93,26 @@ class TestReconocedor(unittest.TestCase):
 
     def test_letra_completa_no_se_confunde_con_el_comienzo_de_otra(self):
         import numpy as np
-        # Una «i» completa («subir, subir...») es el comienzo de la «f»: como prefijo
-        # puede ganar la «f»; exigiendo terminar en el último estado gana la «i».
-        aciertos_prefijo = aciertos_completa = 0
+        from src.gui.recognizer import PESO_FINAL
+        # Una «i» completa es el comienzo de letras más largas (la «f», la «l»): al
+        # levantar el lápiz, pedir que el modelo termine en su último estado nunca debe
+        # acertar menos que el prefijo, y la mayoría de las «i» deben reconocerse.
+        aciertos_prefijo = aciertos_completa = total = 0
         for trazos in self.datos["i"][:15]:
             sim = self.rec.extractor.extract_trazos(trazos)
             if len(sim) < 4:
                 continue
+            total += 1
             aciertos_prefijo += self.rec.motor.classify(np.array(sim))[0] == "i"
-            aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True)[0] == "i"
-        self.assertGreater(aciertos_completa, aciertos_prefijo)
+            aciertos_completa += self.rec.motor.classify(np.array(sim), completa=True,
+                                                         peso_final=PESO_FINAL)[0] == "i"
+        self.assertGreaterEqual(aciertos_completa, aciertos_prefijo)
+        self.assertGreaterEqual(aciertos_completa / total, 0.8)
+
+    def test_peso_final_valida_el_rango(self):
+        import numpy as np
+        with self.assertRaises(ValueError):
+            self.rec.motor.classify(np.array([6, 6, 6, 6]), completa=True, peso_final=1.5)
 
     def test_no_definido_no_aparece_mientras_se_dibuja(self):
         random.seed(3)
@@ -126,6 +136,46 @@ class TestReconocedor(unittest.TestCase):
         self.rec.reiniciar()
         terminada = self.rec.procesar([tilde, cuerpo], dibujando=False)
         self.assertEqual(terminada.simbolos, self.rec.extractor.extract_trazos([cuerpo, tilde]))
+
+    def test_proyeccion_se_ajusta_a_la_letra_del_usuario(self):
+        """Letras más grandes o chicas y corridas, dibujadas a medias: lo que falta debe caer
+        sobre lo que de verdad faltaba (cerca de SU línea base), y en promedio mejor que
+        pegando la plantilla al cursor con la escala estimada."""
+        from src.gui.guia_trazos import trazos_de_letra
+
+        def distancia(pr, verdad):
+            P = [p for t in pr for p in t]
+            V = [p for t in verdad for p in t]
+            return (sum(min(math.dist(p, v) for v in V) for p in P) / len(P)
+                    + sum(min(math.dist(v, p) for p in P) for v in V) / len(V)) / 2
+
+        errores = {"ajustada": [], "pegada": []}
+        for letra, s, dx, dy, frac in (("n", 1.2, -0.06, 0.02, 0.5), ("h", 0.85, 0.05, 0.0, 0.55),
+                                       ("a", 1.25, 0.0, -0.03, 0.45), ("m", 0.85, 0.0, 0.03, 0.4),
+                                       ("y", 1.15, -0.03, 0.0, 0.6), ("d", 1.1, -0.04, 0.0, 0.5)):
+            letra_entera = [[(0.5 + (x - 0.5) * s + dx, 0.56 + (y - 0.56) * s + dy) for x, y in t]
+                            for t in trazos_de_letra(letra)]
+            puntos = [p for t in letra_entera for p in t]
+            corte = int(len(puntos) * frac)
+            dibujado, verdad, cuenta = [], [], 0
+            for t in letra_entera:
+                if cuenta + len(t) <= corte:
+                    dibujado.append(t)
+                elif cuenta < corte:
+                    dibujado.append(t[: corte - cuenta])
+                    verdad.append(t[corte - cuenta:])
+                else:
+                    verdad.append(t)
+                cuenta += len(t)
+            sim = self.rec.extractor.extract_trazos(dibujado)
+            ajustada = self.rec._proyectar(sim, letra, dibujado[-1][-1], self.rec._segmentos(dibujado)[1])
+            pegada = self.rec._proyectar(sim, letra, dibujado[-1][-1])
+            self.assertLess(math.dist(ajustada[0][0], dibujado[-1][-1]), 1e-9, letra)   # arranca en el cursor
+            errores["ajustada"].append(distancia(ajustada, verdad))
+            errores["pegada"].append(distancia(pegada, verdad))
+        media = {k: sum(v) / len(v) for k, v in errores.items()}
+        self.assertLess(media["ajustada"], 0.03)
+        self.assertLessEqual(media["ajustada"], media["pegada"])
 
     def test_umbral_viene_de_los_datos(self):
         self.assertLess(self.rec.umbral, 0)
