@@ -1,36 +1,3 @@
-"""
-recognizer_3d.py
-================
-Reconocedor del modo 3D (esfera). Usa el mismo HMMEngine, la misma temperatura,
-el mismo umbral de «no definido» y la misma alineación con la plantilla que el
-2D; lo que cambia es de dónde salen los símbolos y cómo se dibuja lo que falta.
-
-Marcos de referencia
---------------------
-* Los trazos se guardan en el marco de la ESFERA (puntos unitarios pegados a la
-  superficie): si el usuario la gira, lo dibujado gira con ella.
-* Para analizar se pasan al marco de la VISTA con la rotación actual
-  (v = R · p): x a la derecha, y hacia arriba de la pantalla, z hacia quien
-  mira. Así «arriba» es siempre el borde superior del panel y solo cuenta la
-  cara que se ve (z > 0): si se gira y parte de la letra queda detrás, esa
-  parte se ignora mientras no se vea.
-* La proyección se calcula en el marco de la vista y se devuelve en el de la
-  esfera (Rᵀ · v), para que el lienzo la dibuje pegada a la superficie.
-
-Tamaño y zoom
--------------
-El paso de remuestreo es DEFAULT_PASO_ANGULAR / zoom: con el doble de zoom, una
-letra del mismo tamaño en pantalla cubre la mitad del ángulo y produce los
-mismos símbolos.
-
-Plantillas
-----------
-Los mismos prototipos de la guía que usa el 2D, pegados en el centro de la
-vista con el tamaño de referencia (ANGULO_LIENZO), con sus símbolos esféricos
-y la ruta de Viterbi del modelo 3D. Para proyectar, la plantilla se ajusta
-(escala y traslación) a lo que el usuario ya dibujó, medido en pantalla, y lo
-que falta se levanta a la cara visible de la esfera.
-"""
 from __future__ import annotations
 
 import math

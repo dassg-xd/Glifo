@@ -1,9 +1,3 @@
-"""
-Pruebas del reconocedor del modo 3D (src/gui/recognizer_3d.py).
-
-Ejecutar desde la raíz del proyecto:
-    python -m unittest discover -s tests -v
-"""
 import json
 import math
 import sys

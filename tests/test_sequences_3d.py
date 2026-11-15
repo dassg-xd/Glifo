@@ -1,9 +1,3 @@
-"""
-Pruebas del dataset 3D sintético (training/build_sequences_3d.py).
-
-Ejecutar desde la raíz del proyecto:
-    python -m unittest discover -s tests -v
-"""
 import math
 import random
 import sys

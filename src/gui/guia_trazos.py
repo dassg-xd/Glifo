@@ -1,22 +1,3 @@
-"""
-guia_trazos.py
-==============
-Cómo se traza cada letra, trazo por trazo y en orden. Los caminos salen DEL
-DATASET (data/guia_trazos.json, generado con training/generar_guia.py): cada
-trazo es el trazo mediano de todas las muestras de la letra, así que la guía
-enseña exactamente el diseño único por letra con el que aprenden los modelos.
-Estos son los que usa el reconocedor (plantillas de la proyección).
-
-GUIA_DIBUJO es otra cosa: la guía que se MUESTRA en la «Guía de letras», con los
-trazos dibujados a mano de Glifo Capture (data/guia_dibujo.json, copiados de su
-docs/guia.js). Solo es visual; no entra en el reconocimiento.
-
-Coordenadas en el espacio de 0 a 1000 del lienzo (la y crece hacia abajo) y
-sobre las mismas líneas guía: ascendente 180, altura x 420, línea base 700,
-descendente 900. Cada trazo es un camino SVG con M, L y C; el orden de la lista
-es el orden en que se dibuja. Un trazo que vuelve sobre sí mismo (la «n» baja,
-sube por el mismo palito y hace el arco) es UN solo trazo.
-"""
 from __future__ import annotations
 
 import json

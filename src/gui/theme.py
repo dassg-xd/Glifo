@@ -1,15 +1,3 @@
-"""
-theme.py
-========
-Colores, tipografías y estilos compartidos por todas las vistas.
-
-Los valores salen de los mockups y de Glifo Capture, para que la aplicación
-se vea igual que la página de captura del dataset:
-
-* Texto: Selawik (reemplazo libre de Segoe UI, Microsoft, OFL).
-* La «a» y la «q»: Playwrite AR (letra escolar; la «q» lleva una cruz abajo).
-* Números: Inconsolata.
-"""
 from __future__ import annotations
 
 from pathlib import Path

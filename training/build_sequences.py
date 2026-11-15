@@ -1,29 +1,3 @@
-"""
-build_sequences.py
-==================
-Convierte el dataset de trazos (JSON del equipo) en secuencias de símbolos
-discretos para entrenar los HMM (Baum-Welch) y evaluarlos.
-
-Uso (desde la raíz del proyecto):
-    python training/build_sequences.py --dataset data/glifo-dataset-2026-11-13.json
-    python training/build_sequences.py --k 16 --step 0.03 --holdout 0
-
-Salida: data/secuencias_2d_k<K>.json
-    {
-      "modo": "2d", "k": 8, "n_simbolos": 8, "paso": 0.03, "suavizado": 1,
-      "canvas": 1000.0, "holdout": 0.2, "semilla": 42,
-      "secuencias": { "a": [[0, 0, 1, ...], ...], ... },   # ENTRENAMIENTO
-      "prueba":     { "a": [[...], ...], ... }               # EVALUACIÓN (vacío si --holdout 0)
-    }
-
-Este archivo es GENERADO: hay que volver a crearlo cada vez que cambie el dataset
-(o K, el paso o el suavizado); si no, queda desactualizado sin que nadie lo note.
-
-La partición es por letra y reproducible (misma semilla -> mismo reparto). El
-JSON no dice quién dibujó cada muestra, así que el reparto es aleatorio: la
-precisión sobre "prueba" puede ser algo optimista porque trazos de la misma
-persona se parecen. Con autores identificados conviene separar por autor.
-"""
 from __future__ import annotations
 
 import argparse

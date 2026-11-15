@@ -1,28 +1,3 @@
-"""
-recognizer.py
-=============
-Puente entre la interfaz y los módulos matemáticos.
-
-Recibe los trazos del lienzo (puntos normalizados x/L, y/L) y devuelve lo que
-la ventana 2D necesita mostrar:
-
-1. FeatureExtractor.extract_trazos: trazos -> símbolos O_1:t (chain code,
-   K = 8, orden canónico de trazos y un símbolo por salto del lápiz).
-2. HMMEngine.classify: P(c | O_1:t) para las 27 letras, con escalado de
-   temperatura (T = 3). Mientras el lápiz está abajo se usa la probabilidad de
-   ser el comienzo de cada letra; al levantarlo, la de que la letra termine ahí.
-3. Proyección con la trayectoria aprendida (ver `Plantilla`): el prototipo de
-   la guía de dibujo (el trazo mediano del dataset) se alinea con el trazo del
-   usuario por Viterbi, y se dibuja lo que le falta desde el cursor, con los
-   saltos del lápiz como espacios.
-4. «Trazo no definido»: si la verosimilitud por símbolo de la letra ganadora,
-   log P(O_1:t | λ_ĉ) / t, queda por debajo del umbral, el trazo no se parece a
-   ninguna letra. La probabilidad a posteriori no sirve para esto: al
-   normalizar entre 27 modelos, hasta un garabato le da casi 100 % a alguna.
-   El umbral es un percentil bajo de esa misma medida sobre las secuencias de
-   entrenamiento (hoy el 3: detecta ~97 % de garabatos y marca ~3 % de letras
-   reales). Si se reentrenan los modelos, hay que volver a revisarlo.
-"""
 from __future__ import annotations
 
 import json

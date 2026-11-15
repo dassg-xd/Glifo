@@ -1,38 +1,3 @@
-"""
-build_sequences_3d.py
-=====================
-Dataset 3D SINTÉTICO a partir del dataset 2D: cada muestra se «pega» sobre la
-esfera y de ahí salen las secuencias de símbolos esféricos para entrenar los HMM
-del modo 3D.
-
-Cómo se pega una muestra
-------------------------
-El lienzo 2D (cuadrado de lado 1) se pone sobre el plano tangente de un punto c
-de la cara visible de la esfera y se enrolla sobre la superficie con el mapa
-exponencial: un punto a distancia r del centro del lienzo, en dirección d, cae a
-un ángulo r de c sobre el círculo máximo con esa dirección. Las distancias y
-los ángulos medidos desde el centro se conservan; lejos del centro, la
-curvatura deforma la letra un poco, que es justo lo que los modelos 3D deben
-aprender.
-
-Para que los modelos no dependan de un solo caso, cada muestra se pega varias
-veces con valores al azar:
-  * centro c: θ ∈ ±0.35 rad y φ ∈ π/2 ± 0.30 rad (siempre en la cara visible),
-  * tamaño: el lado del lienzo cubre ANGULO_LIENZO × U(0.7, 1.3) radianes,
-  * giro: ±8°, porque «arriba» es el borde superior del panel y la gente no
-    dibuja perfectamente derecho.
-Lo que quede detrás de la esfera (z ≤ 0) se descarta, como en la GUI.
-
-Uso (desde la raíz del proyecto):
-    python training/build_sequences_3d.py
-    python training/build_sequences_3d.py --copias 4 --copias-prueba 2
-
-Salida: data/secuencias_3d_k<K>.json (mismo formato que el de 2D, con "modo": "3d").
-
-El reparto entrenamiento/prueba es por MUESTRA y se hace antes de pegarlas:
-ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otra
-posición de la esfera.
-"""
 from __future__ import annotations
 
 import argparse

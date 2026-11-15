@@ -1,28 +1,3 @@
-"""
-dataset.py
-==========
-Lector del dataset de trazos del equipo (un único JSON).
-
-Formato de entrada (el que genera el recolector del equipo):
-
-    {
-      "a": [                                  # letra
-        [                                     # muestra
-          [ [481.7, 511.8, 0], [472.9, 505.9, 12], ... ],   # trazo: [x, y, t_ms]
-          [ ... ]                                           # (otro trazo si levantó el lápiz)
-        ],
-        ...
-      ],
-      "b": [ ... ], ...
-    }
-
-Las coordenadas NO son píxeles: Glifo Capture las guarda en una escala de 0 a
-1000 relativa al lienzo de captura, igual en cualquier pantalla (500 es siempre
-la mitad del lienzo). Y crece hacia abajo. Aquí se NORMALIZAN dividiendo entre
-1000 (`canvas`) para quedar en [0, 1]; la GUI debe entregar al FeatureExtractor
-puntos en esa misma escala relativa (x/L, y/L con L = lado de su lienzo).
-El tiempo `t` se descarta: el remuestreo es por longitud de arco, no por tiempo.
-"""
 from __future__ import annotations
 
 import json

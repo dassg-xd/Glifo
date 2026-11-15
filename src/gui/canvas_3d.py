@@ -1,23 +1,3 @@
-"""
-canvas_3d.py
-============
-Lienzo 3D: una esfera que se puede girar y acercar, y sobre la que se dibuja.
-
-* OpenGL (las clases de Qt, sin dependencias extra) dibuja la esfera iluminada
-  con su malla de meridianos y paralelos, con proyección ORTOGRÁFICA: lo que se
-  ve es exactamente la mitad con z > 0 en el marco de la vista, la misma regla
-  que usa el análisis.
-* Encima, con QPainter y el mismo estilo del lienzo 2D, van las líneas guía
-  (fijas en pantalla: «arriba» siempre es arriba), los trazos, la proyección
-  punteada y el cursor.
-
-Controles: clic izquierdo dibuja, clic derecho (o el botón del medio) gira, la
-rueda acerca o aleja.
-
-Marcos: los trazos se guardan en el marco de la ESFERA (puntos unitarios), así
-giran con ella. `rotacion` lleva del marco de la esfera al de la vista
-(x a la derecha, y hacia arriba, z hacia quien mira).
-"""
 from __future__ import annotations
 
 import math

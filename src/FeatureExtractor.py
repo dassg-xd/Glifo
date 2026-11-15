@@ -1,40 +1,3 @@
-"""
-FeatureExtractor.py
-====================
-Módulo de procesamiento geométrico del proyecto Glifo.
-
-Convierte un trazo continuo (lista de puntos del ratón) en una secuencia de
-SÍMBOLOS DISCRETOS (enteros 0..K-1), que es lo que consume el HMM, y hace el
-camino inverso (símbolos -> puntos) para dibujar la proyección punteada.
-
-Solo usa la librería estándar (`math`).
-
-CONVENCIONES (ver docs/contrato_features.md)
---------------------------------------------
-* Símbolo s ∈ {0, ..., K-1} = sector angular centrado en  s · 360°/K.
-  Con K = 8:  0=→  1=↗  2=↑  3=↖  4=←  5=↙  6=↓  7=↘
-* Puntos (x, y) NORMALIZADOS: x/L, y/L, con L = lado del lienzo. El eje Y es el
-  de pantalla (crece hacia abajo); este módulo lo invierte internamente para que
-  "arriba" sea el símbolo 2.
-* El paso de remuestreo `step` está en las mismas unidades que los puntos
-  (fracción del lienzo).
-
-MODO 3D (esfera)
-----------------
-* Puntos (x, y, z) sobre la esfera unitaria, en el MARCO DE LA VISTA: x a la
-  derecha, y hacia arriba de la pantalla, z hacia quien mira. Así «arriba»
-  siempre es el borde superior del panel de dibujo, gire como gire la esfera.
-* Solo cuenta lo que se ve (z > 0): lo que queda detrás se ignora.
-* Cada punto se pasa a coordenadas esféricas (θ, φ):
-      θ = atan2(x, z)   (acimut: crece hacia la derecha)
-      φ = arccos(y)     (ángulo polar: 0 arriba, π/2 en el centro de la vista)
-  y de dos puntos seguidos sale el rumbo sobre la superficie:
-      este  = sin φ · Δθ     (sin el factor sin φ la misma distancia mediría
-      norte = −Δφ             distinto según la altura)
-      rumbo = atan2(norte, este)
-  que se cuantiza igual que en 2D: los símbolos 0..K-1 significan lo mismo.
-* El paso de remuestreo es un ÁNGULO (radianes) medido sobre círculos máximos.
-"""
 from __future__ import annotations
 
 import math
@@ -58,11 +21,6 @@ DEFAULT_SMOOTH_PASSES = 1
 # Cuantización angular (Chain Code)
 # ---------------------------------------------------------------------------
 def quantize_angle(angle: float, k: int) -> int:
-    """Ángulo en radianes -> sector 0..k-1.
-
-    Se suma medio sector antes de dividir para que las direcciones "puras"
-    (0°, 90°, 180°...) caigan en el CENTRO de su sector y no en la frontera.
-    """
     sector = TWO_PI / k
     return int(((angle + sector / 2.0) % TWO_PI) // sector) % k
 
@@ -305,14 +263,6 @@ def _largo3(t: Sequence[Sequence[float]]) -> float:
 
 
 def pegar_en_esfera(trazos, theta0: float, phi0: float, lado: float, giro: float = 0.0) -> list:
-    """Trazos 2D normalizados (0..1, y hacia abajo) -> trazos (x, y, z) sobre la esfera.
-
-    El centro del lienzo cae en (θ0, φ0) del marco de la vista y su lado mide `lado`
-    radianes. Se enrolla con el mapa exponencial: un punto a distancia r del centro
-    del lienzo, en dirección d, cae a un ángulo r de ese centro sobre el círculo
-    máximo con esa dirección. Lo usan el dataset 3D sintético y las plantillas de
-    la proyección 3D.
-    """
     c = de_esfericas(theta0, phi0)
     e, n = base_local(c)
     cg, sg = math.cos(giro), math.sin(giro)
@@ -424,19 +374,6 @@ class FeatureExtractor:
 
     def extract_trazos(self, strokes: Sequence[Sequence[Sequence[float]]], mode: str = "2d",
                        con_saltos: bool = False):
-        """Varios trazos -> una sola secuencia de símbolos.
-
-        Los trazos se ordenan con `ordenar_trazos` y entre uno y otro se agrega
-        UN símbolo con la dirección del salto del lápiz (del final de un trazo
-        al inicio del siguiente). Así el salto conserva la posición relativa
-        (el punto va arriba del palito) sin pesar tanto como un trazo largo.
-
-        Con `con_saltos=True` devuelve (símbolos, índices de los símbolos de salto).
-
-        En modo "3d" los puntos son (x, y, z) en el marco de la vista: primero se
-        descarta lo que no se ve (un trazo que pasa por detrás queda partido en sus
-        tramos visibles) y el salto se mide con el rumbo sobre la esfera.
-        """
         if _check_mode(mode) == "3d":
             tramos = [v for s in strokes for v in visibles(s)]
             trazos = self.ordenar_trazos_3d(tramos)

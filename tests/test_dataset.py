@@ -1,9 +1,3 @@
-"""
-Pruebas del lector del dataset y de build_sequences.
-
-Ejecutar desde la raíz del proyecto:
-    python -m unittest discover -s tests -v
-"""
 import json
 import math
 import sys
