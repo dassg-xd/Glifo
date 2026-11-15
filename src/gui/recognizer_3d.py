@@ -25,7 +25,7 @@ from src.gui.recognizer import (
 )
 
 RUTA_MODELOS_3D = RAIZ / "data" / "modelos_letras_3d.json"
-RUTA_SECUENCIAS_3D = RAIZ / "data" / "secuencias_3d_k8.json"
+RUTA_SECUENCIAS_3D = RAIZ / "data" / "secuencias_3d_k16.json"
 ZOOM_MIN, ZOOM_MAX = 0.6, 3.0
 
 

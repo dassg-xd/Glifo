@@ -12,7 +12,7 @@ from src.HMMEngine import HMMEngine
 
 RAIZ = Path(__file__).resolve().parents[2]
 RUTA_MODELOS = RAIZ / "data" / "modelos_letras_entrenados.json"
-RUTA_SECUENCIAS = RAIZ / "data" / "secuencias_2d_k8.json"
+RUTA_SECUENCIAS = RAIZ / "data" / "secuencias_2d_k16.json"
 CARPETA_DATOS = RAIZ / "data"
 ESCALA_DATASET = 1000.0   # Glifo Capture guarda x, y en la escala 0-1000 del lienzo
 
@@ -44,11 +44,12 @@ TRANSICION = 0.25
 LARGO_SECUNDARIO = 0.25   # largo (fracción del lienzo) bajo el cual un trazo terminado espera al lápiz arriba
 
 
-def alinear_dtw(usuario, plantilla) -> tuple[int, list]:
+def alinear_dtw(usuario, plantilla, k: int = 8) -> tuple[int, list]:
     """DTW de final abierto entre los símbolos del usuario (una letra a medias) y los de la
     plantilla (la letra completa): cuánto de la plantilla cubre lo dibujado.
 
-    Costo entre dos símbolos = diferencia angular en sectores (0 a K/2), más DTW_ESTIRAR
+    Recibe DIRECCIONES (0..k-1, sin la zona). Costo entre dos = diferencia angular medida
+    en octavos de vuelta (0 a 4, sea k = 8 o 16), más DTW_ESTIRAR
     por cada paso que no avanza en las dos secuencias a la vez (sin esa penalización, una
     racha de símbolos iguales se «apila» gratis sobre un solo símbolo de la plantilla y el
     final queda atrasado). Se alinea TODO lo del usuario con un PREFIJO de la plantilla;
@@ -61,13 +62,12 @@ def alinear_dtw(usuario, plantilla) -> tuple[int, list]:
     n, m = len(u), len(p)
     if n == 0 or m == 0:
         return 0, []
-    k = 8
     D = np.full((n + 1, m + 1), np.inf)
     D[0, 0] = 0.0
     for j in range(1, n + 1):
         for i in range(1, m + 1):
             d = abs(u[j - 1] - p[i - 1]) % k
-            costo = min(d, k - d)
+            costo = min(d, k - d) * 8.0 / k
             D[j, i] = costo + min(D[j - 1, i - 1], D[j - 1, i] + DTW_ESTIRAR, D[j, i - 1] + DTW_ESTIRAR)
     finales = D[n, 1:] / (n + np.arange(1, m + 1))
     tau = int(np.argmin(finales))
@@ -240,7 +240,9 @@ class Reconocedor:
     def _dtw(self, simbolos, letra: str, plantilla: Plantilla):
         clave = (tuple(simbolos), letra)
         if getattr(self, "_dtw_clave", None) != clave:
-            self._dtw_clave, self._dtw_valor = clave, alinear_dtw(simbolos, plantilla.simbolos)
+            d = self.extractor.direccion            # el DTW compara direcciones, sin la zona
+            self._dtw_clave, self._dtw_valor = clave, alinear_dtw(
+                [d(x) for x in simbolos], [d(x) for x in plantilla.simbolos], self.extractor.k)
         return self._dtw_valor
 
     # Coordenadas del plano en el que se ajusta y se dibuja la proyección. En 2D es el
