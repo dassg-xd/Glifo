@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from src.FeatureExtractor import (  # noqa: E402
     ALPHABET,
     FeatureExtractor,
+    PASOS_ZONA,
     quantize_angle,
     symbol_to_angle,
 )
@@ -114,7 +115,8 @@ class TestExtract(unittest.TestCase):
 
     def test_extract_trazos_un_solo_trazo_es_extract(self):
         pts = linea((0.2, 0.2), (0.8, 0.7), 50)
-        self.assertEqual(self.fx.extract_trazos([pts]), self.fx.extract(pts))
+        # Las direcciones de la letra son el código de cadena del trazo; la zona va aparte.
+        self.assertEqual([self.fx.direccion(s) for s in self.fx.extract_trazos([pts])], self.fx.extract(pts))
 
     def test_extract_trazos_no_depende_del_orden(self):
         # «ñ»: cuerpo (largo) y virgulilla (corta, arriba). Da igual cuál se dibuje primero.
@@ -132,7 +134,29 @@ class TestExtract(unittest.TestCase):
         sec, saltos = self.fx.extract_trazos([a, b], con_saltos=True)
         self.assertEqual(len(sec), len(self.fx.extract(a)) + 1 + len(self.fx.extract(b)))
         self.assertEqual(saltos, [len(self.fx.extract(a))])
-        self.assertEqual(sec[saltos[0]], 7)           # del final de «a» (arriba) al inicio de «b» (abajo a la derecha)
+        # Del final de «a» (arriba) al inicio de «b» (abajo a la derecha): dirección 7; y como
+        # llega a la altura donde empezó la letra, zona 1 (medio).
+        self.assertEqual((self.fx.direccion(sec[saltos[0]]), self.fx.zona(sec[saltos[0]])), (7, 1))
+
+    def test_extract_trazos_agrega_la_zona_vertical(self):
+        """Un palito que baja: mismas direcciones que `extract`, y la zona pasa de «medio»
+        (cerca del inicio) a «abajo» a los PASOS_ZONA pasos."""
+        fx = self.fx
+        baja = linea((0.5, 0.2), (0.5, 0.8), 40)
+        sec = fx.extract_trazos([baja])
+        self.assertEqual([fx.direccion(s) for s in sec], fx.extract(baja))
+        zonas = [fx.zona(s) for s in sec]
+        self.assertEqual(zonas, sorted(zonas))
+        self.assertEqual(zonas.count(1), PASOS_ZONA)
+        self.assertEqual(set(zonas), {1, 2})
+        sube = fx.extract_trazos([baja[::-1]])
+        self.assertEqual({fx.zona(s) for s in sube}, {0, 1})
+        self.assertTrue(all(0 <= s < fx.n_simbolos for s in sec + sube))
+
+    def test_la_zona_no_depende_de_donde_se_dibuje(self):
+        a = linea((0.2, 0.2), (0.3, 0.6), 40)
+        b = [(x + 0.4, y + 0.3) for x, y in a]
+        self.assertEqual(self.fx.extract_trazos([a]), self.fx.extract_trazos([b]))
 
     def test_extract_2d_es_alias(self):
         pts = linea((0.1, 0.1), (0.9, 0.9), 40)
@@ -148,7 +172,7 @@ class TestReconstruccion(unittest.TestCase):
             self.assertEqual(fx.extract(pts), original)
 
     def test_proyeccion_hacia_arriba(self):
-        fx = FeatureExtractor()
+        fx = FeatureExtractor(k=8)
         pts = fx.symbols_to_points([2, 2, 2], start=(0.5, 0.5))
         self.assertEqual(len(pts), 4)
         self.assertLess(pts[-1][1], pts[0][1])      # y de pantalla disminuye
@@ -163,7 +187,7 @@ class TestReconstruccion(unittest.TestCase):
 
     def test_simbolo_fuera_de_rango(self):
         fx = FeatureExtractor(k=8)
-        for malo in (8, -1, 3.5, True, float("nan")):
+        for malo in (fx.n_simbolos, -1, 3.5, True, float("nan")):
             with self.assertRaises(ValueError, msg=f"simbolo={malo!r}"):
                 fx.symbols_to_points([0, malo], (0.5, 0.5))
 

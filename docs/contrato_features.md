@@ -6,25 +6,34 @@ Convenciones que deben respetar el **HMMEngine** (Integrante 1) y la **GUI** (In
 
 | Parámetro | Valor | Por qué |
 |---|---|---|
-| **K** (sectores) | **8** | K = 16 no mejoró con los datos actuales y exige más datos por modelo |
+| **K** (sectores) | **16** | Con el dataset de un diseño por letra, 16 direcciones separan mejor curvas y diagonales (ver la tabla de abajo) |
+| **Zonas verticales** | **3**, con el borde a **4 pasos** del inicio de la letra | Le dan al HMM la altura del trazo: separan «h»/«n», «b»/«p», «d»/«q» |
 | **Paso de remuestreo** | **0.03** del lado del lienzo | Meseta de mejor rendimiento (0.02–0.04); da ~25 símbolos por letra |
 | **Suavizado** | **1 pasada** | Quita el temblor; 0, 2 y 3 pasadas no se distinguen |
 | **Varios trazos** | Orden canónico y un símbolo por salto (`extract_trazos`) | Da igual en qué orden se dibujen los trazos (con el orden invertido el acierto pasó de 31 % a 85 %); el salto del lápiz conserva la posición relativa sin pesar como un trazo |
 
-Cómo se eligieron: se compararon K ∈ {8, 16} y pasos de 0.02 a 0.05 con un clasificador de referencia sencillo (1 vecino más cercano con distancia de edición, **no es el HMM**). K = 8 con paso 0.03–0.04 dio ≈ 95 % y K = 16 ≈ 94 %; las diferencias están dentro del ruido (±1.7 puntos). Son cifras **optimistas**: el reparto fue aleatorio y las muestras de una misma persona se parecen. Sirven para comparar configuraciones, no como precisión final.
+El paso y el suavizado se eligieron primero con un clasificador de referencia sencillo (1 vecino más cercano con distancia de edición, **no es el HMM**), comparando pasos de 0.02 a 0.05. K y las zonas se eligieron después con el propio HMM.
 
-**Cambiar K, el paso o el suavizado obliga a regenerar las secuencias y reentrenar los 27 modelos.**
+Con el HMM, sobre una validación apartada del entrenamiento (495 muestras; «app» = con los términos de fin y de largo):
+
+| Configuración | Solo HMM | App |
+|---|---|---|
+| K = 8 | 90.9 % | 93.9 % |
+| K = 16 | 91.7 % | 95.8 % |
+| K = 8 × 3 zonas | 95.4 % | 96.4 % |
+| **K = 16 × 3 zonas** | **96.8 %** | **98.0 %** |
+| K = 16 × 4 zonas | 96.8 % | 97.4 % |
+| K = 8, hasta 12 estados | 90.3 % | 94.3 % |
+
+**Cambiar K, las zonas, el paso o el suavizado obliga a regenerar las secuencias y reentrenar los 27 modelos.**
 
 ## 2. Símbolos (lo que consume el HMM)
 
-- Alfabeto de observaciones **V = {0, …, 7}**, así que `n_simbolos = 8`.
-- El símbolo `s` es el sector angular centrado en `s · 45°`:
-
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|---|---|---|---|---|---|---|---|
-| → | ↗ | ↑ | ↖ | ← | ↙ | ↓ | ↘ |
-
-- "Arriba" es el símbolo 2 aunque en pantalla la Y crezca hacia abajo: el extractor invierte el eje internamente.
+- Alfabeto de observaciones **V = {0, …, 47}**: `n_simbolos = K · 3 = 48`.
+- `símbolo = dirección + K · zona`. `fx.direccion(s)` y `fx.zona(s)` los separan.
+- **Dirección** (0 a 15): el sector angular centrado en `d · 22.5°`. 0 = →, 4 = ↑, 8 = ←, 12 = ↓. «Arriba» es 4 aunque en pantalla la Y crezca hacia abajo: el extractor invierte el eje internamente.
+- **Zona** (0 a 2): altura del punto medio del segmento respecto del **primer punto de la letra** (el inicio del primer trazo en el orden canónico). 0 = más de 4 pasos por encima, 1 = a esa altura (±4 pasos), 2 = más de 4 pasos por debajo. La zona de un salto del lápiz es la de su destino. Como se mide desde el inicio de la letra, no depende de en qué parte del lienzo se dibuje.
+- `fx.extract(puntos)` sigue dando el código de cadena puro de **un** trazo (solo direcciones, 0 a K−1). Los símbolos con zona salen de `fx.extract_trazos(trazos)`, que es lo que usan el entrenamiento y la GUI.
 
 ## 3. Qué debe entregar la GUI
 
@@ -39,7 +48,7 @@ Cómo se eligieron: se compararon K ∈ {8, 16} y pasos de 0.02 a 0.05 con un cl
 ```python
 from src.FeatureExtractor import FeatureExtractor, ALPHABET
 
-fx = FeatureExtractor()                 # K=8, step=0.03, smooth_passes=1
+fx = FeatureExtractor()                 # K=16, step=0.03, smooth_passes=1
 
 fx.extract(puntos)                      # -> list[int]  símbolos O_1..O_T
 fx.extract_2d(puntos)                   # alias de extract(puntos, "2d")
@@ -76,10 +85,10 @@ Notas:
 ```
 `letra → muestras → trazos → [x, y, t_ms]`, con `x`, `y` en la escala **0–1000 relativa al lienzo de captura** (no píxeles). El tiempo se descarta.
 
-**Salida** de `python training/build_sequences.py` → `data/secuencias_2d_k8.json`:
+**Salida** de `python training/build_sequences.py` → `data/secuencias_2d_k16.json`:
 
 ```json
-{ "modo": "2d", "k": 8, "n_simbolos": 8, "paso": 0.03, "suavizado": 1,
+{ "modo": "2d", "k": 16, "n_simbolos": 48, "paso": 0.03, "suavizado": 1,
   "canvas": 1000.0, "holdout": 0.2, "semilla": 42,
   "secuencias": { "a": [[0, 0, 1, 2, ...], ...], "b": [...], ... },
   "prueba":     { "a": [[...], ...], ... } }
@@ -94,7 +103,7 @@ Notas:
 
 ```bash
 python training/check_data.py                        # calidad del dataset
-python training/build_sequences.py                   # dataset -> secuencias (K=8)
+python training/build_sequences.py                   # dataset -> secuencias (K=16, 3 zonas)
 python training/build_sequences.py --holdout 0       # todo a entrenamiento
 python -m unittest discover -s tests -v              # pruebas
 ```
@@ -115,7 +124,7 @@ Los puntos llegan como `(x, y, z)` sobre la esfera unitaria, en el **marco de la
 | Coordenadas esféricas | θ = atan2(x, z) (longitud, crece hacia el este) · φ = arccos(y) (polar, 0 en el polo norte y π/2 en el ecuador) |
 | Variaciones | Δθ (llevado a [−π, π]) y Δφ entre dos puntos seguidos |
 | Rumbo sobre la superficie | este = sin φ̄ · Δθ · norte = −Δφ · rumbo = atan2(norte, este) |
-| Símbolo | `quantize_angle(rumbo, K)`: los mismos 8 símbolos del 2D |
+| Símbolo | `quantize_angle(rumbo, K) + K · zona`: el mismo alfabeto del 2D; la zona se mide con φ (abajo = alejarse del polo norte) y su borde es 4 pasos angulares |
 
 El factor sin φ̄ (φ̄ = promedio de los dos φ) hace falta porque, lejos del ecuador, un mismo Δθ recorre menos distancia: sin él, una diagonal parecería horizontal.
 
@@ -146,5 +155,5 @@ Los puntos 3D se normalizan a la esfera; el origen, NaN, infinitos u otra dimens
 
 ### Dataset y modelos 3D
 
-`python training/build_sequences_3d.py` pega cada muestra 2D sobre la esfera con `pegar_en_esfera` (centro en cualquier longitud, θ ∈ ±π, y φ ∈ π/2 ± 0.60; tamaño ±30 %; giro ±8°), 4 veces las de entrenamiento y 2 las de prueba, y escribe `data/secuencias_3d_k8.json`. `python training/entrenar_hmms.py --modo 3d` entrena `data/modelos_letras_3d.json`. **Cambiar el paso, `ANGULO_LIENZO` o los rangos obliga a regenerar y reentrenar.**
+`python training/build_sequences_3d.py` pega cada muestra 2D sobre la esfera con `pegar_en_esfera` (centro en cualquier longitud, θ ∈ ±π, y φ ∈ π/2 ± 0.60; tamaño ±30 %; giro ±8°), 4 veces las de entrenamiento y 2 las de prueba, y escribe `data/secuencias_3d_k16.json`. `python training/entrenar_hmms.py --modo 3d` entrena `data/modelos_letras_3d.json`. **Cambiar el paso, `ANGULO_LIENZO` o los rangos obliga a regenerar y reentrenar.**
 

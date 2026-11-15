@@ -93,7 +93,7 @@ def main() -> int:
             {
                 "modo": "2d",
                 "k": args.k,
-                "n_simbolos": args.k,
+                "n_simbolos": fx.n_simbolos,
                 "paso": args.step,
                 "suavizado": args.smooth,
                 "canvas": args.canvas,

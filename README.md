@@ -42,11 +42,12 @@ flowchart LR
 ## Cómo funciona
 
 ### 1. Convertir el trazo en símbolos
-Cada tramo del trazo se convierte en una de **8 direcciones** (Chain Code, K = 8):
+Cada tramo del trazo se convierte en un símbolo que combina dos cosas:
 
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|---|---|---|---|---|---|---|---|
-| → | ↗ | ↑ | ↖ | ← | ↙ | ↓ | ↘ |
+- **La dirección** del movimiento, en **16 sectores** (Chain Code, K = 16): 0 = →, 4 = ↑, 8 = ←, 12 = ↓ y las intermedias.
+- **La zona vertical**: a qué altura va el trazo respecto del punto donde empezó la letra (0 = arriba, 1 = a la altura del inicio, 2 = abajo; el borde está a 4 pasos, 0.12 del lienzo).
+
+`símbolo = dirección + 16 · zona`, así que el alfabeto tiene 16 × 3 = **48 símbolos**. La zona le dice al modelo dónde va el trazo: sin ella, una «h» y una «n», o una «b» y una «p», se mueven igual.
 
 Antes de cuantizar, el trazo se suaviza y se remuestrea por **longitud de arco** (un punto cada 3 % del lienzo), de modo que la velocidad con la que se dibuja no cambia la secuencia. Detalles en [`docs/contrato_features.md`](docs/contrato_features.md).
 
@@ -56,7 +57,7 @@ Cada modelo está definido por λ = (A, B, π):
 | Elemento | Qué significa |
 |---|---|
 | **A** | Probabilidad de pasar de una fase del trazo a la siguiente |
-| **B** | Probabilidad de ver cada dirección en cada fase |
+| **B** | Probabilidad de ver cada símbolo (dirección y zona) en cada fase |
 | **π** | Probabilidad de empezar en cada fase |
 
 ```mermaid
@@ -137,22 +138,22 @@ Al abrir el modo 2D se cargan los modelos de `data/modelos_letras_entrenados.jso
 python training/entrenar_hmms.py
 ```
 
-Entrena con Baum-Welch los 27 modelos a partir de `data/secuencias_2d_k8.json` y los guarda en `data/modelos_letras_entrenados.json`.
+Entrena con Baum-Welch los 27 modelos a partir de `data/secuencias_2d_k16.json` y los guarda en `data/modelos_letras_entrenados.json`.
 
 ### Modo 3D: dataset sintético y modelos
 
 Solo hay dataset 2D, así que el del modo 3D se fabrica a partir de él:
 
 ```bash
-python training/build_sequences_3d.py          # pega cada muestra 2D sobre la esfera -> data/secuencias_3d_k8.json
+python training/build_sequences_3d.py          # pega cada muestra 2D sobre la esfera -> data/secuencias_3d_k16.json
 python training/entrenar_hmms.py --modo 3d     # entrena los 27 modelos 3D -> data/modelos_letras_3d.json
 ```
 
 Cada muestra se pega varias veces sobre la esfera, derecha respecto al polo norte, en cualquier longitud (también en la cara de atrás) y a una latitud de hasta ±0.6 rad del ecuador, con tamaño (±30 %) y giro (±8°) al azar, enrollando el lienzo sobre la superficie con el mapa exponencial. El reparto entrenamiento/prueba es **por muestra** y se hace antes de pegarlas: ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otro lugar de la esfera.
 
-Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **88.8 %** solo con el HMM y **92.6 %** con el término de largo que usa la app (ver «Cómo decide la letra»). Los modelos 2D sobre esa misma prueba dan 90.3 % solo con el HMM: con el dataset de un diseño por letra ya toleran bien la curvatura.
+Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **96.5 %** solo con el HMM y **97.1 %** con los términos que usa la app al levantar el lápiz (ver «Cómo decide la letra»).
 
-El acierto depende de la latitud, porque junto a los polos los meridianos se juntan y «arriba» deja de ser una sola dirección a lo ancho de la letra: se mantiene cerca de 91 % hasta 0.6 rad (34°) del ecuador, baja a 87 % a 0.9 rad (52°) y a 75 % a 1.1 rad (63°).
+El acierto depende de la latitud, porque junto a los polos los meridianos se juntan y «arriba» deja de ser una sola dirección a lo ancho de la letra: es 97.8 % en el ecuador, 95.4 % a 0.6 rad (34°), 88 % a 0.9 rad (52°) y 75 % a 1.1 rad (63°).
 
 ### La guía de dibujo
 
@@ -171,7 +172,16 @@ Mientras se dibuja se compara la probabilidad de que el trazo sea el **comienzo*
 | El modelo termina en su último estado, log α_T(N) | 0.2 | Que una letra terminada no se confunda con el comienzo de otra más larga |
 | El largo de la secuencia, log N(T; media, desviación de la letra) | 2 | El HMM modela mal las duraciones: sin esto, la «n» absorbía el palito largo de la «h» |
 
-Acierto sobre el 20 % de prueba (2D): 90.6 % sin estos términos, 93.8 % con el primero y **95.8 %** con los dos. Se probó también entrenar con copias deformadas (aumento de datos) y empeoró (92.0 %), así que no se usa.
+Acierto sobre el 20 % de prueba (2D): **95.6 %** solo con el HMM y **97.8 %** con los dos términos.
+
+Cómo se llegó ahí (mismas muestras de prueba):
+
+| Símbolos | Solo HMM | Con los dos términos |
+|---|---|---|
+| 8 direcciones | 93.6 % | 95.8 % |
+| 16 direcciones × 3 zonas (actual) | 95.6 % | 97.8 % |
+
+La configuración se eligió con una validación apartada del entrenamiento, no con la prueba. Ahí también se probó, sin mejora: más estados por letra (12 y 16), 4 y 5 zonas, y entrenar con copias deformadas (aumento de datos).
 
 ### Pruebas
 
@@ -190,13 +200,13 @@ Muestra cuántas muestras hay por letra (la meta de Glifo Capture es 70; se camb
 ### Generar las secuencias de entrenamiento
 
 ```bash
-python training/build_sequences.py                 # K=8, 20 % para prueba
+python training/build_sequences.py                 # K=16 y 3 zonas, 20 % para prueba
 python training/build_sequences.py --holdout 0     # todo a entrenamiento (modelo final)
 ```
 
-Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k8.json`, que consume el entrenamiento del HMM. Cada muestra del dataset es `letra → muestras → trazos → [x, y, t_ms]`, con `x`, `y` en la escala 0–1000 relativa al lienzo de Glifo Capture (no son píxeles).
+Lee el `data/glifo-dataset-*.json` más reciente y crea `data/secuencias_2d_k16.json`, que consume el entrenamiento del HMM. Cada muestra del dataset es `letra → muestras → trazos → [x, y, t_ms]`, con `x`, `y` en la escala 0–1000 relativa al lienzo de Glifo Capture (no son píxeles).
 
-> **Regenerar con `python training/build_sequences.py` cada vez que cambie el dataset.** `secuencias_2d_k8.json` es un archivo generado: si el dataset cambia y no se vuelve a crear, queda desactualizado sin que nadie lo note.
+> **Regenerar con `python training/build_sequences.py` cada vez que cambie el dataset.** `secuencias_2d_k16.json` es un archivo generado: si el dataset cambia y no se vuelve a crear, queda desactualizado sin que nadie lo note.
 
 ---
 
@@ -242,8 +252,8 @@ Glifo/
 ├── assets/fonts/                 # Selawik, Playwrite AR (a y q) e Inconsolata (OFL)
 ├── data/
 │   ├── glifo-dataset-*.json      # Trazos de ejemplo
-│   ├── secuencias_2d_k8.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
-│   ├── secuencias_3d_k8.json     # Secuencias 3D sintéticas GENERADAS
+│   ├── secuencias_2d_k16.json     # Secuencias GENERADAS (regenerar si cambia el dataset)
+│   ├── secuencias_3d_k16.json     # Secuencias 3D sintéticas GENERADAS
 │   ├── guia_trazos.json          # Plantillas GENERADAS del dataset (reconocedor)
 │   ├── guia_dibujo.json          # Guía que se muestra (la de Glifo Capture, hecha a mano)
 │   ├── modelos_letras_entrenados.json  # Modelos HMM del modo 2D

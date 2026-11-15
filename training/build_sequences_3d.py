@@ -119,7 +119,7 @@ def main() -> int:
             {
                 "modo": "3d",
                 "k": args.k,
-                "n_simbolos": args.k,
+                "n_simbolos": fx.n_simbolos,
                 "paso": args.paso,
                 "angulo_lienzo": ANGULO_LIENZO,
                 "suavizado": args.smooth,
