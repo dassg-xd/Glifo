@@ -12,8 +12,13 @@ VALID_K = (8, 16)
 VALID_MODES = ("2d", "3d")
 
 # Valores por defecto: fijados con los datos reales (ver docs/contrato_features.md).
-DEFAULT_K = 8
+DEFAULT_K = 16
 DEFAULT_STEP = 0.03
+# Zona vertical de cada símbolo de una letra: a qué altura va el trazo respecto del punto
+# donde empezó la letra. 0 = arriba, 1 = a la altura del inicio, 2 = abajo. El borde entre
+# zonas está a PASOS_ZONA pasos de remuestreo del inicio (0.12 del lienzo con el paso 0.03).
+N_ZONAS = 3
+PASOS_ZONA = 4
 DEFAULT_SMOOTH_PASSES = 1
 
 
@@ -23,6 +28,13 @@ DEFAULT_SMOOTH_PASSES = 1
 def quantize_angle(angle: float, k: int) -> int:
     sector = TWO_PI / k
     return int(((angle + sector / 2.0) % TWO_PI) // sector) % k
+
+
+def zona_vertical(bajada: float, borde: float) -> int:
+    """Zona de un punto que está `bajada` por debajo del inicio de la letra (negativo = arriba)."""
+    if bajada < -borde:
+        return 0
+    return 2 if bajada > borde else 1
 
 
 def symbol_to_angle(symbol: int, k: int) -> float:
@@ -286,11 +298,18 @@ def pegar_en_esfera(trazos, theta0: float, phi0: float, lado: float, giro: float
 # Clase principal
 # ---------------------------------------------------------------------------
 class FeatureExtractor:
-    """Trazo continuo <-> secuencia de símbolos discretos (2D).
+    """Trazo continuo <-> secuencia de símbolos discretos.
+
+    `extract` da el código de cadena puro de un trazo: una dirección (0..k-1) por segmento.
+    `extract_trazos` da los símbolos de una LETRA, que es lo que ven los HMM: cada símbolo
+    combina la dirección con la zona vertical, símbolo = dirección + k · zona, así que el
+    alfabeto tiene `n_simbolos` = k · N_ZONAS valores (48 con k = 16). La zona le dice al
+    modelo a qué altura va el trazo: sin ella, una «h» y una «n» (o una «b» y una «p») se
+    mueven igual y solo se distinguían por el largo.
 
     Parámetros
     ----------
-    k             : número de sectores angulares: 8 o 16. Es el tamaño del alfabeto V.
+    k             : número de sectores angulares: 8 o 16.
     step          : paso de remuestreo 2D, en fracción del lado del lienzo.
     smooth_passes : pasadas de suavizado previo (0 = sin suavizar).
     paso_angular  : paso de remuestreo 3D, en radianes sobre la esfera.
@@ -315,6 +334,19 @@ class FeatureExtractor:
         self.step = float(step)
         self.smooth_passes = smooth_passes
         self.paso_angular = float(paso_angular)
+
+    @property
+    def n_simbolos(self) -> int:
+        """Tamaño del alfabeto de `extract_trazos` (el M de los HMM)."""
+        return self.k * N_ZONAS
+
+    def direccion(self, simbolo: int) -> int:
+        """Dirección (0..k-1) de un símbolo de letra."""
+        return int(simbolo) % self.k
+
+    def zona(self, simbolo: int) -> int:
+        """Zona vertical (0 = arriba, 1 = medio, 2 = abajo) de un símbolo de letra."""
+        return int(simbolo) // self.k
 
     # ------------------------------------------------------------- utilidades
     @staticmethod
@@ -379,26 +411,43 @@ class FeatureExtractor:
 
     def extract_trazos(self, strokes: Sequence[Sequence[Sequence[float]]], mode: str = "2d",
                        con_saltos: bool = False):
-        if _check_mode(mode) == "3d":
-            # Cuenta toda la esfera, se vea o no, en su propio marco (norte = polo +y).
+        """Trazos de una letra -> símbolos (dirección + k · zona), en el orden canónico.
+        Cada levantada de lápiz deja un símbolo con la dirección del salto. La zona de un
+        segmento es la de su punto medio (la de un salto, la de su destino) respecto del
+        primer punto de la letra. En modo "3d" los puntos van en el marco de la esfera,
+        cuenta toda la esfera y «abajo» es alejarse del polo norte (φ creciente)."""
+        tres_d = _check_mode(mode) == "3d"
+        if tres_d:
             trazos = self.ordenar_trazos_3d(strokes)
-            simbolos, saltos = [], []
-            for i, t in enumerate(trazos):
-                if i > 0 and angulo_entre(trazos[i - 1][-1], t[0]) > 1e-9:
-                    saltos.append(len(simbolos))
-                    simbolos.append(quantize_angle(rumbo(trazos[i - 1][-1], t[0]), self.k))
-                simbolos.extend(self.extract(t, "3d"))
-            return (simbolos, saltos) if con_saltos else simbolos
-        trazos = self.ordenar_trazos(strokes)
+            borde = PASOS_ZONA * self.paso_angular
+            altura = lambda p: a_esfericas(p)[1]
+        else:
+            trazos = [[_check_point(p) for p in t] for t in self.ordenar_trazos(strokes)]
+            borde = PASOS_ZONA * self.step
+            altura = lambda p: p[1]
         simbolos: list = []
         saltos: list = []
+        if not trazos:
+            return (simbolos, saltos) if con_saltos else simbolos
+        inicio = altura(trazos[0][0])
+
+        def simbolo(a, b, destino: bool = False) -> int:
+            if tres_d:
+                direccion = quantize_angle(rumbo(a, b), self.k)
+            else:
+                # El eje Y de pantalla crece hacia abajo: se invierte para que 90° = arriba.
+                direccion = quantize_angle(math.atan2(-(b[1] - a[1]), b[0] - a[0]), self.k)
+            h = altura(b) if destino else (altura(a) + altura(b)) / 2
+            return direccion + self.k * zona_vertical(h - inicio, borde)
+
         for i, t in enumerate(trazos):
             if i > 0:
-                (x0, y0), (x1, y1) = _check_point(trazos[i - 1][-1]), _check_point(t[0])
-                if math.hypot(x1 - x0, y1 - y0) > 1e-9:
+                a, b = trazos[i - 1][-1], t[0]
+                if (angulo_entre(a, b) if tres_d else math.dist(a, b)) > 1e-9:
                     saltos.append(len(simbolos))
-                    simbolos.append(quantize_angle(math.atan2(-(y1 - y0), x1 - x0), self.k))
-            simbolos.extend(self.extract(t, mode))
+                    simbolos.append(simbolo(a, b, destino=True))
+            pts = self.preprocess(t, mode)
+            simbolos.extend(simbolo(a, b) for a, b in zip(pts, pts[1:]))
         return (simbolos, saltos) if con_saltos else simbolos
 
     # ---------------------------------------------------------- preprocesado
@@ -412,7 +461,8 @@ class FeatureExtractor:
 
     # -------------------------------------------------------------- extracción
     def extract(self, points: Sequence[Sequence[float]], mode: str = "2d") -> list:
-        """Trazo -> lista de símbolos (n puntos remuestreados -> n-1 símbolos)."""
+        """Un trazo -> su código de cadena: una dirección 0..k-1 por segmento, sin zona
+        (n puntos remuestreados -> n-1 direcciones)."""
         pts = self.preprocess(points, mode)
         if mode == "3d":
             return [quantize_angle(rumbo(a, b), self.k) for a, b in zip(pts, pts[1:])]
@@ -436,6 +486,7 @@ class FeatureExtractor:
         step: Optional[float] = None,
     ) -> list:
         """Símbolos -> coordenadas partiendo de `start` (misma convención que extract).
+        Acepta direcciones o símbolos de letra: de estos solo usa la dirección.
 
         Es lo que usa la GUI para la proyección punteada: los símbolos restantes
         {O_t+1..O_T} que entrega el HMM y la posición actual del cursor.
@@ -448,17 +499,17 @@ class FeatureExtractor:
             p = _check_point3(start)
             pts = [p]
             for s in symbols:
-                if isinstance(s, bool) or int(s) != s or not 0 <= int(s) < self.k:
-                    raise ValueError(f"Símbolo fuera de rango 0..{self.k - 1}: {s!r}.")
-                p = mover(p, symbol_to_angle(int(s), self.k), paso)
+                if isinstance(s, bool) or int(s) != s or not 0 <= int(s) < self.n_simbolos:
+                    raise ValueError(f"Símbolo fuera de rango 0..{self.n_simbolos - 1}: {s!r}.")
+                p = mover(p, symbol_to_angle(self.direccion(s), self.k), paso)
                 pts.append(p)
             return pts
         x, y = _check_point(start)
         pts = [(x, y)]
         for s in symbols:
-            if isinstance(s, bool) or int(s) != s or not 0 <= int(s) < self.k:
-                raise ValueError(f"Símbolo fuera de rango 0..{self.k - 1}: {s!r}.")
-            a = symbol_to_angle(int(s), self.k)
+            if isinstance(s, bool) or int(s) != s or not 0 <= int(s) < self.n_simbolos:
+                raise ValueError(f"Símbolo fuera de rango 0..{self.n_simbolos - 1}: {s!r}.")
+            a = symbol_to_angle(self.direccion(s), self.k)
             x += paso * math.cos(a)
             y -= paso * math.sin(a)  # hacia arriba = Y de pantalla decreciente
             pts.append((x, y))

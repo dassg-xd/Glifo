@@ -45,7 +45,7 @@ class TestCoordenadas(unittest.TestCase):
 
 class TestRumbo(unittest.TestCase):
     def test_cuatro_direcciones(self):
-        fx = FeatureExtractor()
+        fx = FeatureExtractor(k=8)
         self.assertEqual(set(fx.extract(arco(-0.3, CENTRO, 0.3, CENTRO), "3d")), {0})       # →
         self.assertEqual(set(fx.extract(arco(0, CENTRO + 0.3, 0, CENTRO - 0.3), "3d")), {2})  # ↑
         self.assertEqual(set(fx.extract(arco(0.3, CENTRO, -0.3, CENTRO), "3d")), {4})       # ←
@@ -113,13 +113,17 @@ class TestTodaLaEsfera(unittest.TestCase):
         vuelta = arco(-0.4, CENTRO, math.pi + 0.4, CENTRO, n=200)
         simbolos, saltos = fx.extract_trazos([vuelta], "3d", con_saltos=True)
         self.assertEqual(saltos, [])
-        self.assertTrue(all(s == 0 for s in simbolos))
+        self.assertTrue(all(fx.direccion(s) == 0 for s in simbolos))
 
     def test_arriba_es_el_polo_norte(self):
-        """Subir por un meridiano es «arriba» (símbolo 2) en cualquier longitud de la esfera."""
+        """Subir por un meridiano es «arriba» (un cuarto de vuelta) en cualquier longitud de la
+        esfera, y la zona pasa de «medio» a «arriba» al alejarse del inicio hacia el polo norte."""
         fx = FeatureExtractor()
         for theta in (0.0, 1.5, math.pi, -2.0):
-            self.assertTrue(all(s == 2 for s in fx.extract(arco(theta, 1.9, theta, 1.3), "3d")))
+            sube = arco(theta, 1.9, theta, 1.3)
+            self.assertTrue(all(s == fx.k // 4 for s in fx.extract(sube, "3d")))
+            zonas = [fx.zona(s) for s in fx.extract_trazos([sube], "3d")]
+            self.assertEqual((zonas[0], zonas[-1]), (1, 0))
 
     def test_orden_de_trazos_al_cruzar_el_meridiano_pi(self):
         """Dos palitos a los lados de θ = ±π se ordenan de izquierda a derecha, como en θ = 0."""
@@ -136,7 +140,7 @@ class TestVariosTrazos3D(unittest.TestCase):
         fx = FeatureExtractor()
         palito, punto = arco(0, 1.6, 0, 1.9, n=10), [de_esfericas(0, 1.45), de_esfericas(0.002, 1.452)]
         self.assertEqual(fx.extract_trazos([palito, punto], "3d"), fx.extract_trazos([punto, palito], "3d"))
-        self.assertEqual(fx.extract_trazos([palito, punto], "3d")[-1], 2)   # el salto va hacia arriba
+        self.assertEqual(fx.direccion(fx.extract_trazos([palito, punto], "3d")[-1]), fx.k // 4)   # el salto va hacia arriba
 
 
 if __name__ == "__main__":
