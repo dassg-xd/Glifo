@@ -5,7 +5,7 @@ Ventana C: reconocedor y visualizador 3D (lienzo esférico).
 
 Misma estructura que la Ventana B: a la izquierda la esfera con la proyección
 punteada; a la derecha el listado ordenado de P(c | O_1:t); abajo, centrados,
-«Limpiar lienzo», «Reiniciar captura» y «Centrar vista».
+«Borrar último trazo», «Reiniciar captura» y «Centrar vista».
 
 El reconocedor 3D se carga la primera vez que se entra al modo (ver
 `VentanaPrincipal.ir_a_modo`), para no alargar el arranque del programa.
@@ -76,9 +76,9 @@ class Vista3D(QWidget):
         pie.setContentsMargins(40, 24, 40, 30)
         pie.setSpacing(16)
         pie.addStretch(1)
-        self.boton_limpiar = boton("Limpiar lienzo", "primario", 190, 46)
-        self.boton_limpiar.setToolTip("Borra el trazo")
-        self.boton_limpiar.clicked.connect(self.limpiar_lienzo)
+        self.boton_limpiar = boton("Borrar último trazo", "primario", 190, 46)
+        self.boton_limpiar.setToolTip("Quita solo el último trazo que dibujaste")
+        self.boton_limpiar.clicked.connect(self.borrar_ultimo)
         self.boton_reiniciar = boton("Reiniciar captura", "secundario", 190, 46)
         self.boton_reiniciar.setStyleSheet("QPushButton { font-size: 15px; font-weight: bold; }")
         self.boton_reiniciar.setToolTip("Borra el trazo, reinicia el reconocimiento, centra la esfera y cierra la guía")
@@ -102,8 +102,8 @@ class Vista3D(QWidget):
         self.reconocedor = reconocedor
         self.actualizar()
 
-    def limpiar_lienzo(self):
-        self.lienzo.limpiar()
+    def borrar_ultimo(self):
+        self.lienzo.borrar_ultimo()
 
     def reiniciar_captura(self):
         self.capa_guia.ocultar()
