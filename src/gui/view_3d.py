@@ -5,7 +5,7 @@ Ventana C: reconocedor y visualizador 3D (lienzo esférico).
 
 Misma estructura que la Ventana B: a la izquierda la esfera con la proyección
 punteada; a la derecha el listado ordenado de P(c | O_1:t); abajo, centrados,
-«Borrar último trazo», «Reiniciar captura» y «Centrar vista».
+«Borrar último trazo», «Borrar todo» y «Centrar vista».
 
 El reconocedor 3D se carga la primera vez que se entra al modo (ver
 `VentanaPrincipal.ir_a_modo`), para no alargar el arranque del programa.
@@ -79,10 +79,10 @@ class Vista3D(QWidget):
         self.boton_limpiar = boton("Borrar último trazo", "primario", 190, 46)
         self.boton_limpiar.setToolTip("Quita solo el último trazo que dibujaste")
         self.boton_limpiar.clicked.connect(self.borrar_ultimo)
-        self.boton_reiniciar = boton("Reiniciar captura", "secundario", 190, 46)
+        self.boton_reiniciar = boton("Borrar todo", "secundario", 190, 46)
         self.boton_reiniciar.setStyleSheet("QPushButton { font-size: 15px; font-weight: bold; }")
-        self.boton_reiniciar.setToolTip("Borra el trazo, reinicia el reconocimiento, centra la esfera y cierra la guía")
-        self.boton_reiniciar.clicked.connect(self.reiniciar_captura)
+        self.boton_reiniciar.setToolTip("Borra todos los trazos y empieza de nuevo (la esfera no se mueve)")
+        self.boton_reiniciar.clicked.connect(self.borrar_todo)
         self.boton_centrar = boton("Centrar vista", "secundario", 190, 46)
         self.boton_centrar.setStyleSheet("QPushButton { font-size: 15px; font-weight: bold; }")
         self.boton_centrar.setToolTip("Vuelve a la orientación y al tamaño iniciales de la esfera, sin borrar")
@@ -105,12 +105,10 @@ class Vista3D(QWidget):
     def borrar_ultimo(self):
         self.lienzo.borrar_ultimo()
 
-    def reiniciar_captura(self):
-        self.capa_guia.ocultar()
+    def borrar_todo(self):
         if self.reconocedor is not None:
             self.reconocedor.reiniciar()
         self.lienzo.limpiar()
-        self.lienzo.centrar_vista()
 
     def _alternar_guia(self, abrir: bool):
         if abrir:

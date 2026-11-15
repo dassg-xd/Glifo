@@ -98,10 +98,10 @@ class Vista2D(QWidget):
         self.boton_limpiar = boton("Borrar último trazo", "primario", 190, 46)
         self.boton_limpiar.setToolTip("Quita solo el último trazo que dibujaste")
         self.boton_limpiar.clicked.connect(self.borrar_ultimo)
-        self.boton_reiniciar = boton("Reiniciar captura", "secundario", 190, 46)
+        self.boton_reiniciar = boton("Borrar todo", "secundario", 190, 46)
         self.boton_reiniciar.setStyleSheet("QPushButton { font-size: 15px; font-weight: bold; }")
-        self.boton_reiniciar.setToolTip("Borra el trazo, reinicia el reconocimiento y cierra la guía")
-        self.boton_reiniciar.clicked.connect(self.reiniciar_captura)
+        self.boton_reiniciar.setToolTip("Borra todos los trazos y empieza de nuevo")
+        self.boton_reiniciar.clicked.connect(self.borrar_todo)
         pie.addWidget(self.boton_limpiar)
         pie.addWidget(self.boton_reiniciar)
         pie.addStretch(1)
@@ -116,8 +116,7 @@ class Vista2D(QWidget):
     def borrar_ultimo(self):
         self.lienzo.borrar_ultimo()
 
-    def reiniciar_captura(self):
-        self.capa_guia.ocultar()
+    def borrar_todo(self):
         self.reconocedor.reiniciar()
         self.lienzo.limpiar()
 
