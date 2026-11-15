@@ -195,8 +195,7 @@ class Lienzo3D(QOpenGLWidget):
             k = 1.0 / self.radio()
             giro = _rot("y", d.x() * k) @ _rot("x", d.y() * k)
             self.rotacion = giro @ self.rotacion
-            self.update()
-            self.trazos_cambiaron.emit()        # lo que se ve cambió: se vuelve a analizar
+            self.update()                       # girar no cambia el análisis: todo se mide en la esfera
             return
         if not self._dibujando:
             return
@@ -306,6 +305,7 @@ class Lienzo3D(QOpenGLWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         self._dibujar_guias(p)
+        self._dibujar_norte(p)
         if self.vacio:
             self._dibujar_ayuda(p)
         else:
@@ -316,18 +316,19 @@ class Lienzo3D(QOpenGLWidget):
         p.end()
 
     def _dibujar_guias(self, p: QPainter):
-        """Las líneas guía del 2D, fijas en pantalla: arriba siempre es arriba."""
-        from src.FeatureExtractor import ANGULO_LIENZO
-        r, c = self.radio(), self.centro()
+        """Las líneas guía del 2D como paralelos de la esfera, alrededor del ecuador: giran con
+        ella, porque «arriba» es su polo norte y no el borde del panel. Con zoom el renglón se
+        angosta sobre la esfera, así en pantalla se ve del mismo alto."""
+        from src.FeatureExtractor import ANGULO_LIENZO, de_esfericas
         p.setFont(T.fuente(11))
+        p.setBrush(Qt.BrushStyle.NoBrush)
         for nombre, fy in T.LINEAS_GUIA:
-            w = -(fy - 0.5) * ANGULO_LIENZO / self.zoom       # ángulo desde el centro de la vista
-            if abs(w) >= math.pi / 2:
+            phi = math.pi / 2 + (fy - 0.5) * ANGULO_LIENZO / self.zoom
+            if not 0.05 < phi < math.pi - 0.05:
                 continue
-            y = c.y() - math.sin(w) * r
-            media = math.cos(w) * r                            # media cuerda de la esfera a esa altura
-            x0, x1 = max(16.0, c.x() - media), min(self.width() - 16.0, c.x() + media)
-            if x1 <= x0:
+            paralelo = [de_esfericas(math.radians(g), phi) for g in range(0, 361, 3)]
+            caminos = self._caminos(paralelo, delante=True)
+            if not caminos:
                 continue
             if nombre == "línea base":
                 p.setPen(QPen(T.color(T.GUIA_FUERTE), 2))
@@ -335,23 +336,68 @@ class Lienzo3D(QOpenGLWidget):
                 pluma = QPen(T.color(T.GUIA_FUERTE, 0.9), 1.5, Qt.PenStyle.CustomDashLine)
                 pluma.setDashPattern([4, 4])
                 p.setPen(pluma)
-            p.drawLine(QPointF(x0, y), QPointF(x1, y))
+            for camino in caminos:
+                self._trazar(p, camino)
+            izquierda = min((q for c in caminos for q in c), key=lambda q: q.x())
             p.setPen(T.color(T.APAGADO))
-            p.drawText(QPointF(x0 + 6, y - 6), nombre)
+            p.drawText(QPointF(izquierda.x() + 8, izquierda.y() - 6), nombre)
+
+    def _dibujar_norte(self, p: QPainter):
+        """Marca los polos sobre la esfera y, en la esquina, una brújula con la dirección en
+        pantalla del polo norte: hacia allá es «arriba» para el reconocedor."""
+        R = self.rotacion
+        p.setFont(T.fuente(10, True))
+        for nombre, eje in (("N", (0.0, 1.0, 0.0)), ("S", (0.0, -1.0, 0.0))):
+            v = R @ np.asarray(eje)
+            if v[2] <= 0:
+                continue
+            c = self._pantalla(v)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(T.color(T.PRIMARIO if nombre == "N" else T.APAGADO))
+            p.drawEllipse(c, 10, 10)
+            p.setPen(T.color("#ffffff"))
+            p.drawText(QRectF(c.x() - 10, c.y() - 10, 20, 20), Qt.AlignmentFlag.AlignCenter, nombre)
+
+        norte = R @ np.array([0.0, 1.0, 0.0])
+        centro, radio = QPointF(self.width() - 44, 44), 26.0
+        p.setPen(QPen(T.color(T.BORDE), 1.5))
+        p.setBrush(T.color(T.SUPERFICIE, 0.9))
+        p.drawEllipse(centro, radio, radio)
+        largo = math.hypot(norte[0], norte[1])
+        p.setBrush(T.color(T.PRIMARIO))
+        if largo < 0.15:                                  # el polo mira de frente (o de espaldas)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(centro, 4, 4)
+        else:
+            ux, uy = norte[0] / largo, -norte[1] / largo  # en pantalla la y crece hacia abajo
+            punta = QPointF(centro.x() + ux * (radio - 9), centro.y() + uy * (radio - 9))
+            cola = QPointF(centro.x() - ux * (radio - 12), centro.y() - uy * (radio - 12))
+            pluma = QPen(T.color(T.PRIMARIO), 2.5)
+            pluma.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(pluma)
+            p.drawLine(cola, punta)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawPolygon([punta,
+                           QPointF(punta.x() - ux * 9 - uy * 5, punta.y() - uy * 9 + ux * 5),
+                           QPointF(punta.x() - ux * 9 + uy * 5, punta.y() - uy * 9 - ux * 5)])
+        p.setPen(T.color(T.APAGADO))
+        p.setFont(T.fuente(10))
+        p.drawText(QRectF(centro.x() - 40, centro.y() + radio + 2, 80, 16), Qt.AlignmentFlag.AlignCenter, "norte")
 
     def _dibujar_ayuda(self, p: QPainter):
         p.setPen(T.color(T.APAGADO))
         p.setFont(T.fuente(13))
         p.drawText(QRectF(0, self.height() - 34, self.width(), 24), Qt.AlignmentFlag.AlignCenter,
-                   "Clic izquierdo: dibujar · clic derecho: girar · rueda: acercar")
+                   "Clic izquierdo: dibujar · clic derecho: girar · rueda: acercar · arriba es el polo N")
 
-    def _caminos_visibles(self, trazo):
-        """Partes visibles (z > 0 en la vista) de un trazo del marco de la esfera, en pantalla."""
+    def _caminos(self, trazo, delante: bool):
+        """Partes de un trazo del marco de la esfera que quedan en la cara que se ve
+        (`delante`) o en la de atrás, ya en coordenadas de pantalla."""
         R = self.rotacion
         caminos, actual = [], []
         for q in trazo:
             v = R @ np.asarray(q)
-            if v[2] > 0:
+            if (v[2] > 0) == delante:
                 actual.append(self._pantalla(v))
             elif actual:
                 caminos.append(actual)
@@ -373,10 +419,17 @@ class Lienzo3D(QOpenGLWidget):
         pluma = QPen(T.color(T.TINTA), max(3.5, self.radio() / 50))
         pluma.setCapStyle(Qt.PenCapStyle.RoundCap)
         pluma.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pluma)
         p.setBrush(Qt.BrushStyle.NoBrush)
+        # Lo que quedó en la cara de atrás también cuenta: se deja ver, tenue, a través de la esfera.
+        atras = QPen(pluma)
+        atras.setColor(T.color(T.TINTA, 0.22))
+        p.setPen(atras)
         for trazo in self.trazos:
-            for camino in self._caminos_visibles(trazo):
+            for camino in self._caminos(trazo, delante=False):
+                self._trazar(p, camino)
+        p.setPen(pluma)
+        for trazo in self.trazos:
+            for camino in self._caminos(trazo, delante=True):
                 self._trazar(p, camino)
 
     def _dibujar_proyeccion(self, p: QPainter):
@@ -387,7 +440,7 @@ class Lienzo3D(QOpenGLWidget):
         p.setPen(pluma)
         p.setBrush(Qt.BrushStyle.NoBrush)
         for tramo in self.proyeccion:
-            for camino in self._caminos_visibles(tramo):
+            for camino in self._caminos(tramo, delante=True):
                 if all(abs(q.x() - camino[0].x()) + abs(q.y() - camino[0].y()) < 0.5 for q in camino):
                     # Un punto (el de la «i»): con la línea punteada no se vería.
                     p.save()
