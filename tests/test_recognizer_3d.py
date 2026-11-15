@@ -15,17 +15,6 @@ from src.gui.recognizer_3d import Reconocedor3D  # noqa: E402
 DATASET = sorted((ROOT / "data").glob("glifo-dataset-*.json"))[-1]
 
 
-def rot(eje: str, a: float) -> np.ndarray:
-    c, s = math.cos(a), math.sin(a)
-    return {"x": np.array([[1, 0, 0], [0, c, -s], [0, s, c]]),
-            "y": np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])}[eje]
-
-
-def a_cuerpo(trazos_vista, R):
-    """Puntos de la vista -> marco de la esfera para una rotación R (cuerpo = Rᵀ · vista)."""
-    return [[tuple(R.T @ np.asarray(p)) for p in t] for t in trazos_vista]
-
-
 class TestReconocedor3D(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -39,36 +28,41 @@ class TestReconocedor3D(unittest.TestCase):
     def test_plantillas_para_las_27(self):
         self.assertEqual(len(self.r.plantillas), 27)
 
-    def test_el_giro_de_la_esfera_no_cambia_el_resultado(self):
-        """La misma letra vista de frente da lo mismo con cualquier orientación de la esfera."""
-        vista = pegar_en_esfera(self.muestra("e"), 0.1, 1.5, ANGULO_LIENZO)
+    def test_se_reconoce_en_cualquier_longitud_incluso_atras(self):
+        """Cuenta toda la esfera: la misma letra da lo mismo adelante, de lado o en la cara de atrás."""
         resultados = set()
-        for R in (np.eye(3), rot("y", 0.7), rot("x", -0.5) @ rot("y", 2.0)):
-            r = self.r.procesar_3d(a_cuerpo(vista, R), R, dibujando=False)
+        for theta in (0.1, 1.6, math.pi, -2.4):
+            r = self.r.procesar_3d(pegar_en_esfera(self.muestra("e"), theta, 1.5, ANGULO_LIENZO), dibujando=False)
             resultados.add((r.letra, tuple(r.simbolos)))
         self.assertEqual(len(resultados), 1)
         self.assertEqual(resultados.pop()[0], "e")
 
-    def test_lo_de_atras_se_ignora(self):
-        vista = pegar_en_esfera(self.muestra("o"), 0.0, math.pi / 2, ANGULO_LIENZO)
-        detras = a_cuerpo(vista, np.eye(3))
-        self.assertEqual(self.r.procesar_3d(detras, rot("y", math.pi), dibujando=False).estado, "pocos")
+    def test_arriba_es_el_polo_norte_no_la_pantalla(self):
+        """Una letra derecha respecto al polo norte se reconoce; la misma letra acostada 90°
+        sobre la esfera ya no da los mismos símbolos (no existe un «arriba» de la pantalla)."""
+        derecha = pegar_en_esfera(self.muestra("e"), 0.3, 1.5, ANGULO_LIENZO)
+        acostada = pegar_en_esfera(self.muestra("e"), 0.3, 1.5, ANGULO_LIENZO, giro=math.pi / 2)
+        r1 = self.r.procesar_3d(derecha, dibujando=False)
+        self.r.reiniciar()
+        r2 = self.r.procesar_3d(acostada, dibujando=False)
+        self.assertEqual(r1.letra, "e")
+        self.assertNotEqual(r1.simbolos, r2.simbolos)
 
     def test_zoom(self):
         """Con zoom 2, una letra de la mitad del ángulo se lee igual."""
         r = self.r.procesar_3d(pegar_en_esfera(self.muestra("a"), 0, math.pi / 2, ANGULO_LIENZO / 2),
-                               np.eye(3), dibujando=False, zoom=2.0)
+                               dibujando=False, zoom=2.0)
         self.assertEqual(r.letra, "a")
 
     def test_proyeccion_parte_del_cursor_y_queda_en_la_esfera(self):
-        R = rot("y", 0.4)
-        vista = pegar_en_esfera(self.muestra("e"), 0.1, 1.5, ANGULO_LIENZO)
-        cuerpo = a_cuerpo(vista, R)
-        mitad = [cuerpo[0][: len(cuerpo[0]) // 2]]
-        r = self.r.procesar_3d(mitad, R, dibujando=True)
-        self.assertEqual(r.estado, "reconocido")
-        self.assertTrue(r.proyeccion)
-        self.assertLess(angulo_entre(r.proyeccion[0][0], mitad[0][-1]), 1e-9)
+        for theta in (0.1, 2.9):                                   # adelante y en la cara de atrás
+            cuerpo = pegar_en_esfera(self.muestra("e"), theta, 1.5, ANGULO_LIENZO)
+            mitad = [cuerpo[0][: len(cuerpo[0]) // 2]]
+            self.r.reiniciar()
+            r = self.r.procesar_3d(mitad, dibujando=True)
+            self.assertEqual(r.estado, "reconocido")
+            self.assertTrue(r.proyeccion)
+            self.assertLess(angulo_entre(r.proyeccion[0][0], mitad[0][-1]), 1e-9)
         for tramo in r.proyeccion:
             for p in tramo:
                 self.assertAlmostEqual(float(np.linalg.norm(p)), 1.0, places=9)
@@ -79,25 +73,23 @@ class TestReconocedor3D(unittest.TestCase):
         cuerpo, tilde = self.r.extractor.ordenar_trazos(trazos)
         cuerpo3, tilde3 = pegar_en_esfera([cuerpo, tilde], 0.0, math.pi / 2, ANGULO_LIENZO)
         a_medias = cuerpo3[: len(cuerpo3) // 2]
-        con_tilde = self.r.procesar_3d([tilde3, a_medias], np.eye(3), dibujando=True)
+        con_tilde = self.r.procesar_3d([tilde3, a_medias], dibujando=True)
         self.r.reiniciar()
-        sin_tilde = self.r.procesar_3d([a_medias], np.eye(3), dibujando=True)
+        sin_tilde = self.r.procesar_3d([a_medias], dibujando=True)
         self.assertEqual(con_tilde.simbolos, sin_tilde.simbolos)
 
     def test_proyeccion_se_ajusta_a_la_letra_del_usuario(self):
         from src.gui.guia_trazos import trazos_de_letra
         n = [[(0.5 + (x - 0.5) * 1.15 + 0.04, 0.56 + (y - 0.56) * 1.15) for x, y in t] for t in trazos_de_letra("n")]
-        vista = pegar_en_esfera(n, 0.1, math.pi / 2 - 0.05, ANGULO_LIENZO)
-        mitad = [vista[0][: len(vista[0]) // 2]]
-        sim = self.r.extractor.extract_trazos(mitad, "3d")
-        pr = self.r._proyectar(sim, "n", mitad[-1][-1], self.r._segmentos_3d(mitad))
-        self.assertLess(angulo_entre(pr[-1][-1], vista[-1][-1]), 0.06)
-        for tramo in pr:
-            for p in tramo:
-                self.assertGreater(p[2], 0.0)                      # todo en la cara visible
+        for theta in (0.1, -2.7):                                  # adelante y en la cara de atrás
+            entera = pegar_en_esfera(n, theta, math.pi / 2 - 0.05, ANGULO_LIENZO)
+            mitad = [entera[0][: len(entera[0]) // 2]]
+            sim = self.r.extractor.extract_trazos(mitad, "3d")
+            pr = self.r._proyectar_3d(sim, "n", mitad, mitad[-1][-1])
+            self.assertLess(angulo_entre(pr[-1][-1], entera[-1][-1]), 0.06)
 
     def test_vacio(self):
-        self.assertEqual(self.r.procesar_3d([], np.eye(3)).estado, "vacio")
+        self.assertEqual(self.r.procesar_3d([]).estado, "vacio")
 
 
 if __name__ == "__main__":

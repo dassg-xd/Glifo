@@ -23,8 +23,7 @@ from .view_2d import Leyenda
 from .widgets import BarraSuperior, Tarjeta, boton, etiqueta
 
 SUB_VACIO = "Clic izquierdo para dibujar · clic derecho para girar · rueda para acercar"
-SUB_DIBUJO = "Solo cuenta la cara que se ve: lo que quede detrás al girar se ignora"
-SUB_DETRAS = "Tu letra quedó detrás de la esfera: gírala con clic derecho para volver a verla"
+SUB_DIBUJO = "Cuenta toda la esfera, se vea o no · «arriba» es su polo norte (N), gire como gire"
 
 
 class Vista3D(QWidget):
@@ -132,17 +131,12 @@ class Vista3D(QWidget):
             r_estado = "vacio" if self.lienzo.vacio else "pocos"
             self._pintar_vacio(r_estado)
             return
-        r = self.reconocedor.procesar_3d(self.lienzo.trazos, self.lienzo.rotacion,
-                                         dibujando=self.lienzo.dibujando, zoom=self.lienzo.zoom)
+        r = self.reconocedor.procesar_3d(self.lienzo.trazos, dibujando=self.lienzo.dibujando,
+                                         zoom=self.lienzo.zoom)
         hay_trazo = not self.lienzo.vacio
         self.boton_limpiar.setEnabled(hay_trazo)
         self.boton_reiniciar.setEnabled(hay_trazo)
-        if not hay_trazo:
-            self.subtitulo.setText(SUB_VACIO)
-        elif r.estado == "pocos" and not r.simbolos and not self.lienzo.dibujando:
-            self.subtitulo.setText(SUB_DETRAS)
-        else:
-            self.subtitulo.setText(SUB_DIBUJO)
+        self.subtitulo.setText(SUB_DIBUJO if hay_trazo else SUB_VACIO)
         self.leyenda.setVisible(r.estado in ("reconocido", "no_definido"))
         self.leyenda.no_definido = r.estado == "no_definido"
         self.leyenda.update()
@@ -160,7 +154,6 @@ class Vista3D(QWidget):
 
     def _pintar_vacio(self, estado: str):
         self._letra_actual = None
-        # «pocos» también cubre una letra que quedó toda detrás de la esfera.
         self.panel.mostrar_vacio(dibujando=estado == "pocos")
         self.lienzo.mostrar_resultado([], False)
         hay_trazo = not self.lienzo.vacio
