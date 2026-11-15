@@ -1,9 +1,3 @@
-"""
-widgets.py
-==========
-Piezas visuales reutilizables: logo, tarjetas, fichas de letra, íconos y la
-barra superior común a las ventanas 2D y 3D.
-"""
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal

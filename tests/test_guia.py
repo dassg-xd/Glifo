@@ -1,13 +1,3 @@
-"""
-Pruebas de la guía de dibujo (data/guia_trazos.json, src/gui/guia_trazos.py).
-
-La guía sale del dataset (training/generar_guia.py), así que quien la sigue debe
-ser reconocido: si cambia el dataset y no se regenera la guía, estas pruebas lo
-avisan.
-
-Ejecutar desde la raíz del proyecto:
-    python -m unittest discover -s tests -v
-"""
 import math
 import sys
 import unittest

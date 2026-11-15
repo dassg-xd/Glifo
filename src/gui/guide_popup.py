@@ -1,13 +1,3 @@
-"""
-guide_popup.py
-==============
-«Guía de letras»: panel desplegable que muestra cómo se traza cada letra, como
-la guía de dibujo de Glifo Capture: la letra completa en gris y, encima, cada
-trazo se dibuja solo y en orden, con su número donde empieza.
-
-Los trazos son los de la guía de dibujo de Glifo Capture, hechos a mano
-(data/guia_dibujo.json): curvas limpias y simétricas, solo para mostrar.
-"""
 from __future__ import annotations
 
 import json

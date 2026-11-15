@@ -1,8 +1,3 @@
-"""
-menu_view.py
-============
-Ventana A: menú principal. Permite elegir el modo de trabajo (2D o 3D) y salir.
-"""
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal

@@ -1,11 +1,3 @@
-"""
-ranking_panel.py
-================
-Panel derecho: listado ordenado de mayor a menor de P(c | O_1:t), con la letra
-como ícono de referencia, su barra y su porcentaje.
-
-Estados: vacío (las 27 letras), «sigue dibujando», ranking y trazo no definido.
-"""
 from __future__ import annotations
 
 from PySide6.QtCore import QRectF, Qt

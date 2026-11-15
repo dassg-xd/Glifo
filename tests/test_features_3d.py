@@ -1,10 +1,3 @@
-"""
-Pruebas del modo 3D de FeatureExtractor: coordenadas esféricas, rumbo con
-(Δθ, Δφ), remuestreo sobre círculos máximos y «solo cuenta lo que se ve».
-
-Ejecutar desde la raíz del proyecto:
-    python -m unittest discover -s tests -v
-"""
 import math
 import sys
 import unittest

@@ -1,31 +1,3 @@
-"""
-generar_guia.py
-===============
-Saca la guía de dibujo DEL PROPIO DATASET: para cada letra calcula un
-prototipo (el trazo mediano de todas las muestras) y lo escribe como caminos
-SVG suaves, en el formato de la guía de Glifo Capture.
-
-Así la guía enseña exactamente el diseño con el que aprenden los modelos. La
-usan la «Guía de letras» de la app, las plantillas de la proyección y, copiada,
-la guía de dibujo de Glifo Capture.
-
-Cómo se calcula el prototipo
-----------------------------
-1. Se toman las muestras con el número de trazos más común de la letra, en
-   orden canónico (FeatureExtractor.ordenar_trazos), y se descartan las de
-   tamaño atípico (alto fuera de 0.75–1.33 veces la mediana).
-2. Cada trazo se remuestrea por longitud de arco al mismo número de puntos y se
-   toma la MEDIANA punto a punto (robusta a muestras raras).
-3. El trazo se simplifica (Ramer–Douglas–Peucker), se parte en las esquinas
-   agudas (como donde la «n» vuelve a subir por el palito) y cada pieza se
-   convierte en curvas de Bézier (Catmull-Rom).
-
-Uso (desde la raíz del proyecto):
-    python training/generar_guia.py                 # escribe data/guia_trazos.json
-    python training/generar_guia.py --js guia.js    # además, el archivo para Glifo Capture
-
-Volver a correrlo cada vez que cambie el dataset.
-"""
 from __future__ import annotations
 
 import argparse

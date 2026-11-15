@@ -1,10 +1,3 @@
-"""
-main_window.py
-==============
-Ventana principal: funciona como las secciones del HTML de los mockups.
-Solo una sección es visible a la vez (menú, 2D o 3D) y se cambia entre ellas
-con los botones de cada vista.
-"""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt

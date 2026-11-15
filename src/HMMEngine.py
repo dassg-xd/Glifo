@@ -10,16 +10,6 @@ class HMMEngine:
     # 1. MATEMÁTICAS CORE (Algoritmos base)
     # ---------------------------------------------------------
     def _inicializar_hmm(self, N, M, secuencias=None, piso=1e-3):
-        """Inicializa pi, A, B con topología estricta Left-to-Right.
-
-        Sin `secuencias`, B arranca al azar. Con `secuencias` se usa la
-        inicialización por tramos, la habitual en modelos izquierda-derecha:
-        cada secuencia se parte en N tramos iguales, el tramo i se asigna al
-        estado i y B arranca con la frecuencia de cada símbolo en su tramo
-        (más un piso para que ninguna emisión empiece en 0). La
-        autotransición a_ii se elige para que la duración media de cada
-        estado, 1/(1 - a_ii), sea el largo medio de un tramo (T_medio / N).
-        """
         pi = np.zeros(N)
         pi[0] = 1.0
 
@@ -277,37 +267,6 @@ class HMMEngine:
     # ---------------------------------------------------------
     def classify(self, O, prior_uniforme=True, temperatura=1.0, completa=False, peso_final=1.0,
                  largos=None, peso_largo=0.0):
-        """Clasifica una secuencia (completa o parcial).
-
-        Con `completa=False` usa P(O_1:t | λ_c) = Σ_i α_t(i): la probabilidad de
-        que el trazo sea el COMIENZO de la letra (sirve mientras se dibuja).
-        Con `completa=True` usa P(O, q_T = N | λ_c) = α_T(N): exige que el modelo
-        termine en su último estado. Así una letra terminada no se confunde con
-        el comienzo de otra más larga (la «i» con la «f», la «o» con la «a»).
-
-        `peso_final` (0..1, solo con `completa=True`) mezcla los dos criterios:
-        log P = log Σ_i α_T(i) + peso_final · log(α_T(N) / Σ_i α_T(i)).
-        Con 1 es α_T(N) completo; con 0, el prefijo. Exigir el último estado del
-        todo castiga a las letras cuyo final varía mucho entre personas (con el
-        dataset de un diseño por letra, la «n» se iba a «h»); un peso intermedio
-        conserva la ventaja sin ese costo.
-
-        `largos` ({letra: (media, desviación)} del largo de las secuencias de
-        entrenamiento) y `peso_largo` (solo con `completa=True`) suman
-        peso_largo · log N(T; media_c, desviación_c): la probabilidad de que la
-        letra c tenga T símbolos. El HMM modela mal las duraciones (cada estado
-        dura un tiempo geométrico), así que una «n» puede absorber el palito largo
-        de una «h»; el largo total, que en el dataset es 29 contra 36 símbolos,
-        las separa.
-
-        P(c | O) ∝ P(O | λ_c)^(1/T), con prior uniforme. Con T = 1 es la
-        regla de Bayes tal cual. Como P(O | λ_c) multiplica una probabilidad
-        por símbolo, en 20-30 símbolos cualquier diferencia se amplifica y casi
-        siempre una letra se queda con ~100 % aunque esté equivocada. T > 1
-        (escalado de temperatura) suaviza esos porcentajes para que la
-        confianza mostrada se parezca al acierto real. No cambia el orden del
-        ranking ni la letra ganadora.
-        """
         if temperatura <= 0:
             raise ValueError("temperatura debe ser positiva.")
         if not 0.0 <= peso_final <= 1.0:
@@ -359,18 +318,6 @@ class HMMEngine:
         return d
 
     def project(self, O, pasos_a_proyectar=None, letra=None):
-        """Proyecta los símbolos restantes {O_t+1, ..., O_T} de la letra más probable.
-
-        1. ĉ = argmax_c P(O_1:t | λ_c)  (o `letra`, si la GUI ya la conoce).
-        2. Estado actual: argmax_i α_t(i) en el modelo de ĉ.
-        3. Se recorre la trayectoria aprendida: en cada estado, desde el actual
-           hasta el último, se emite el símbolo más probable argmax_k b_i(k)
-           durante su duración esperada. Del estado actual solo se proyecta la
-           mitad de su duración, porque parte ya se dibujó.
-
-        `pasos_a_proyectar` limita la cantidad de símbolos (None = hasta el final).
-        Devuelve (letra, lista de símbolos).
-        """
         letra_predicha = letra if letra is not None else self.classify(O)[0]
         modelo = self.modelos[letra_predicha]
         A, B = modelo['A'], modelo['B']

@@ -1,11 +1,3 @@
-"""
-view_2d.py
-==========
-Ventana B: reconocedor y visualizador 2D.
-
-Izquierda: lienzo con proyección punteada. Derecha: listado ordenado de
-P(c | O_1:t). Abajo, centrados: «Limpiar lienzo» y «Reiniciar captura».
-"""
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, Qt, Signal
