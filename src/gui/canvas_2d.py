@@ -50,6 +50,17 @@ class Lienzo2D(QWidget):
         return QPointF(c.left() + p[0] * c.width(), c.top() + p[1] * c.height())
 
     # ------------------------------------------------------------- acciones
+    def borrar_ultimo(self) -> None:
+        """Quita el último trazo (deshacer); los anteriores se quedan."""
+        if not self.trazos:
+            return
+        self.trazos.pop()
+        self.proyeccion = []
+        self.no_definido = False
+        self._dibujando = False
+        self.update()
+        self.trazos_cambiaron.emit()
+
     def limpiar(self) -> None:
         self.trazos = []
         self.proyeccion = []

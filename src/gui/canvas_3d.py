@@ -150,6 +150,17 @@ class Lienzo3D(QOpenGLWidget):
         return QPointF(c.x() + v[0] * r, c.y() - v[1] * r)
 
     # ------------------------------------------------------------- acciones
+    def borrar_ultimo(self) -> None:
+        """Quita el último trazo (deshacer); los anteriores se quedan."""
+        if not self.trazos:
+            return
+        self.trazos.pop()
+        self.proyeccion = []
+        self.no_definido = False
+        self._dibujando = False
+        self.update()
+        self.trazos_cambiaron.emit()
+
     def limpiar(self) -> None:
         self.trazos = []
         self.proyeccion = []
@@ -344,7 +355,7 @@ class Lienzo3D(QOpenGLWidget):
 
     def _dibujar_norte(self, p: QPainter):
         """Marca los polos sobre la esfera y, en la esquina, una brújula con la dirección en
-        pantalla del polo norte: hacia allá es «arriba» para el reconocedor."""
+        pantalla del polo norte, rotulada «Arriba»: hacia allá es arriba para el reconocedor."""
         R = self.rotacion
         p.setFont(T.fuente(10, True))
         for nombre, eje in (("N", (0.0, 1.0, 0.0)), ("S", (0.0, -1.0, 0.0))):
@@ -382,7 +393,7 @@ class Lienzo3D(QOpenGLWidget):
                            QPointF(punta.x() - ux * 9 + uy * 5, punta.y() - uy * 9 - ux * 5)])
         p.setPen(T.color(T.APAGADO))
         p.setFont(T.fuente(10))
-        p.drawText(QRectF(centro.x() - 40, centro.y() + radio + 2, 80, 16), Qt.AlignmentFlag.AlignCenter, "norte")
+        p.drawText(QRectF(centro.x() - 40, centro.y() + radio + 2, 80, 16), Qt.AlignmentFlag.AlignCenter, "Arriba")
 
     def _dibujar_ayuda(self, p: QPainter):
         p.setPen(T.color(T.APAGADO))
