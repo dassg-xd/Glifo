@@ -101,23 +101,23 @@ python -m unittest discover -s tests -v              # pruebas
 
 ## 8. Modo 3D (esfera)
 
-### Marco de la vista
+### Marco de la esfera
 
-Los puntos llegan como `(x, y, z)` sobre la esfera unitaria, en el **marco de la vista**: `x` a la derecha, `y` hacia arriba de la pantalla, `z` hacia quien mira. La GUI guarda los trazos pegados a la esfera y, antes de analizar, los multiplica por la rotación actual (`v = R · p`). Con eso:
+Los puntos llegan como `(x, y, z)` sobre la esfera unitaria, en el **marco de la propia esfera**, tal como la GUI los guarda pegados a la superficie. La rotación de la vista no interviene en el análisis:
 
-- **«Arriba» es siempre el borde superior del panel**, gire como gire la esfera.
-- **Solo cuenta lo que se ve** (`z > 0`). Un trazo que pasa por detrás queda partido en sus tramos visibles, que se unen con un símbolo de salto, igual que dos trazos.
+- **«Arriba» es el polo norte de la esfera** (su eje `+y`): subir es ir hacia el polo por el meridiano. No depende del panel ni de cómo esté girada la esfera.
+- **Cuenta toda la esfera**, se vea o no. Un trazo que pasa por la cara de atrás sigue siendo un solo trazo.
 
 ### De (x, y, z) a símbolos
 
 | Paso | Fórmula |
 |---|---|
-| Coordenadas esféricas | θ = atan2(x, z) (acimut, crece a la derecha) · φ = arccos(y) (polar, 0 arriba y π/2 en el centro de la vista) |
+| Coordenadas esféricas | θ = atan2(x, z) (longitud, crece hacia el este) · φ = arccos(y) (polar, 0 en el polo norte y π/2 en el ecuador) |
 | Variaciones | Δθ (llevado a [−π, π]) y Δφ entre dos puntos seguidos |
 | Rumbo sobre la superficie | este = sin φ̄ · Δθ · norte = −Δφ · rumbo = atan2(norte, este) |
 | Símbolo | `quantize_angle(rumbo, K)`: los mismos 8 símbolos del 2D |
 
-El factor sin φ̄ (φ̄ = promedio de los dos φ) hace falta porque, lejos del centro, un mismo Δθ recorre menos distancia: sin él, una diagonal parecería horizontal.
+El factor sin φ̄ (φ̄ = promedio de los dos φ) hace falta porque, lejos del ecuador, un mismo Δθ recorre menos distancia: sin él, una diagonal parecería horizontal.
 
 ### Remuestreo y tamaño
 
@@ -129,16 +129,16 @@ El factor sin φ̄ (φ̄ = promedio de los dos φ) hace falta porque, lejos del 
 
 ```python
 fx = FeatureExtractor()                              # paso_angular = 0.048 rad
-fx.extract_trazos(trazos_vista, "3d")                # trazos (x, y, z) -> símbolos (solo lo visible)
-fx.extract(puntos_vista, "3d")                       # un trazo
-fx.preprocess(puntos_vista, "3d")                    # puntos suavizados y equiespaciados sobre la esfera
+fx.extract_trazos(trazos, "3d")                      # trazos (x, y, z) -> símbolos (toda la esfera)
+fx.extract(puntos, "3d")                             # un trazo
+fx.preprocess(puntos, "3d")                          # puntos suavizados y equiespaciados sobre la esfera
 fx.symbols_to_points(simbolos, inicio, "3d")         # camina por círculos máximos desde `inicio`
-FeatureExtractor.ordenar_trazos_3d(trazos)           # orden canónico: θ en lugar de x, φ en lugar de y
+FeatureExtractor.ordenar_trazos_3d(trazos)           # orden canónico: θ (desde el centro de la letra) en lugar de x, φ en lugar de y
 
 a_esfericas(p) / de_esfericas(theta, phi)            # (x, y, z) <-> (θ, φ)
 rumbo(a, b)                                          # dirección de a hacia b con (Δθ, Δφ)
 mover(p, rumbo, distancia)                           # avanzar por el círculo máximo
-visibles(trazo)                                      # tramos con z > 0
+centro_esferico(trazos)                              # centro de la letra sobre la esfera
 pegar_en_esfera(trazos_2d, theta0, phi0, lado, giro) # lienzo 2D -> esfera (mapa exponencial)
 ```
 
@@ -146,5 +146,5 @@ Los puntos 3D se normalizan a la esfera; el origen, NaN, infinitos u otra dimens
 
 ### Dataset y modelos 3D
 
-`python training/build_sequences_3d.py` pega cada muestra 2D sobre la cara visible con `pegar_en_esfera` (centro θ ∈ ±0.35, φ ∈ π/2 ± 0.30; tamaño ±30 %; giro ±8°), 4 veces las de entrenamiento y 2 las de prueba, y escribe `data/secuencias_3d_k8.json`. `python training/entrenar_hmms.py --modo 3d` entrena `data/modelos_letras_3d.json`. **Cambiar el paso, `ANGULO_LIENZO` o los rangos obliga a regenerar y reentrenar.**
+`python training/build_sequences_3d.py` pega cada muestra 2D sobre la esfera con `pegar_en_esfera` (centro en cualquier longitud, θ ∈ ±π, y φ ∈ π/2 ± 0.60; tamaño ±30 %; giro ±8°), 4 veces las de entrenamiento y 2 las de prueba, y escribe `data/secuencias_3d_k8.json`. `python training/entrenar_hmms.py --modo 3d` entrena `data/modelos_letras_3d.json`. **Cambiar el paso, `ANGULO_LIENZO` o los rangos obliga a regenerar y reentrenar.**
 

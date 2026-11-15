@@ -118,7 +118,6 @@ def _resample(points: list, step: float) -> list:
 # cómodo dé más o menos tantos símbolos como en el plano.
 ANGULO_LIENZO = 1.6
 DEFAULT_PASO_ANGULAR = DEFAULT_STEP * ANGULO_LIENZO
-Z_VISIBLE = 0.0   # z > Z_VISIBLE: el punto está en la cara que se ve
 
 
 def _check_point3(p: Sequence[float]) -> tuple:
@@ -138,7 +137,9 @@ def _check_point3(p: Sequence[float]) -> tuple:
 
 
 def a_esfericas(p: Sequence[float]) -> tuple:
-    """(x, y, z) en el marco de la vista -> (θ, φ). θ: acimut, φ: ángulo polar desde arriba."""
+    """(x, y, z) en el marco de la ESFERA -> (θ, φ). θ: longitud (acimut alrededor del eje
+    de los polos), φ: ángulo polar medido desde el polo norte (0 = polo norte, π/2 = ecuador).
+    El polo norte es el eje +y de la esfera: «arriba» es ir hacia él por el meridiano."""
     x, y, z = _check_point3(p)
     return math.atan2(x, z), math.acos(max(-1.0, min(1.0, y)))
 
@@ -168,7 +169,7 @@ def _slerp(a: Sequence[float], b: Sequence[float], t: float) -> tuple:
 
 def rumbo(a: Sequence[float], b: Sequence[float]) -> float:
     """Dirección del movimiento de a a b sobre la superficie, en radianes (0 = derecha,
-    π/2 = arriba), calculada con las variaciones (Δθ, Δφ) de las coordenadas esféricas."""
+    π/2 = arriba = hacia el polo norte), con las variaciones (Δθ, Δφ) de las coordenadas esféricas."""
     ta, pa = a_esfericas(a)
     tb, pb = a_esfericas(b)
     dtheta = (tb - ta + math.pi) % TWO_PI - math.pi      # el salto de -π a π no es un giro entero
@@ -178,7 +179,7 @@ def rumbo(a: Sequence[float], b: Sequence[float]) -> float:
 
 
 def base_local(p: Sequence[float]) -> tuple:
-    """Vectores unitarios «este» y «norte» del plano tangente en p (marco de la vista)."""
+    """Vectores unitarios «este» y «norte» del plano tangente en p (marco de la esfera)."""
     x, y, z = p
     n = math.hypot(x, z)
     if n < 1e-9:                     # justo en el polo: el este no está definido
@@ -199,19 +200,17 @@ def mover(p: Sequence[float], direccion: float, distancia: float) -> tuple:
     return (q[0] / m, q[1] / m, q[2] / m)
 
 
-def visibles(stroke: Sequence[Sequence[float]]) -> list:
-    """Parte un trazo en los tramos que se ven (z > 0). Lo que queda detrás se descarta."""
-    tramos, actual = [], []
-    for p in stroke:
-        q = _check_point3(p)
-        if q[2] > Z_VISIBLE:
-            actual.append(q)
-        elif actual:
-            tramos.append(actual)
-            actual = []
-    if actual:
-        tramos.append(actual)
-    return tramos
+def centro_esferico(strokes: Sequence[Sequence[Sequence[float]]]):
+    """Punto de la esfera en el centro de los trazos (su media, normalizada). None si los
+    puntos se cancelan (por ejemplo, un trazo que da la vuelta entera)."""
+    sx = sy = sz = 0.0
+    for t in strokes:
+        for p in t:
+            sx, sy, sz = sx + p[0], sy + p[1], sz + p[2]
+    m = math.sqrt(sx * sx + sy * sy + sz * sz)
+    if m < 1e-9:
+        return None
+    return (sx / m, sy / m, sz / m)
 
 
 def _dedupe3(points: Sequence[Sequence[float]], eps: float = 1e-9) -> list:
@@ -360,23 +359,29 @@ class FeatureExtractor:
     @staticmethod
     def ordenar_trazos_3d(strokes: Sequence[Sequence[Sequence[float]]]) -> list:
         """El mismo orden canónico de `ordenar_trazos`, sobre la esfera: el largo se mide
-        en ángulo, «izquierda» es menor θ y «arriba» es menor φ."""
+        en ángulo, «izquierda» es menor θ y «arriba» es menor φ. θ se mide desde el centro
+        de la letra, para que el orden no cambie si la letra cruza el meridiano ±π."""
         trazos = [[_check_point3(p) for p in s] for s in strokes if len(s) > 0]
         if len(trazos) < 2:
             return trazos
+        c = centro_esferico(trazos)
+        theta_c = a_esfericas(c)[0] if c else 0.0
+
+        def theta(p):
+            return (a_esfericas(p)[0] - theta_c + math.pi) % TWO_PI - math.pi
         largos = [_largo3(t) for t in trazos]
         tope = max(largos)
         principales = [t for t, l in zip(trazos, largos) if l >= 0.5 * tope]
         secundarios = [t for t, l in zip(trazos, largos) if l < 0.5 * tope]
-        principales.sort(key=lambda t: a_esfericas(t[0])[0])
-        secundarios.sort(key=lambda t: (a_esfericas(t[0])[1], a_esfericas(t[0])[0]))
+        principales.sort(key=lambda t: theta(t[0]))
+        secundarios.sort(key=lambda t: (a_esfericas(t[0])[1], theta(t[0])))
         return principales + secundarios
 
     def extract_trazos(self, strokes: Sequence[Sequence[Sequence[float]]], mode: str = "2d",
                        con_saltos: bool = False):
         if _check_mode(mode) == "3d":
-            tramos = [v for s in strokes for v in visibles(s)]
-            trazos = self.ordenar_trazos_3d(tramos)
+            # Cuenta toda la esfera, se vea o no, en su propio marco (norte = polo +y).
+            trazos = self.ordenar_trazos_3d(strokes)
             simbolos, saltos = [], []
             for i, t in enumerate(trazos):
                 if i > 0 and angulo_entre(trazos[i - 1][-1], t[0]) > 1e-9:

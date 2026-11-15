@@ -60,7 +60,7 @@ class TestQuienSigueLaGuiaEsReconocido(unittest.TestCase):
         for letra in ALPHABET:
             r.reiniciar()
             vista = pegar_en_esfera(trazos_de_letra(letra), 0.05, math.pi / 2, ANGULO_LIENZO)
-            res = r.procesar_3d(vista, np.eye(3), dibujando=False)
+            res = r.procesar_3d(vista, dibujando=False)
             if not (res.estado == "reconocido" and res.letra == letra):
                 malas.append((letra, res.estado, res.letra))
         self.assertLessEqual(len(malas), 1, malas)

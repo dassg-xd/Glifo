@@ -91,8 +91,8 @@ La ventana 2D tiene:
 La ventana 3D tiene la misma estructura, con una **esfera** como lienzo:
 
 - **Controles:** clic izquierdo dibuja, clic derecho (o el botón del medio) gira la esfera, la rueda acerca o aleja. «Centrar vista» la devuelve a como empezó, sin borrar.
-- **«Arriba» es siempre el borde superior del panel**, gire como gire la esfera. Las líneas guía se quedan fijas en pantalla.
-- **Solo cuenta la cara que se ve.** Si se gira y parte de la letra queda detrás, esa parte se ignora mientras no se vea.
+- **«Arriba» está definido en la esfera: es su polo norte** (marcado con una N). No depende del panel: si la esfera se gira, «arriba» gira con ella. Las líneas guía son paralelos de la esfera, alrededor del ecuador, y una brújula en la esquina muestra hacia dónde queda el norte en pantalla.
+- **Cuenta toda la esfera**, se vea o no. Lo que queda en la cara de atrás se sigue analizando y se deja ver, tenue, a través de la esfera. Girar la vista no cambia el resultado.
 - Los puntos se pasan a **coordenadas esféricas (θ, φ)** y los símbolos salen de las variaciones (Δθ, Δφ) sobre la superficie (ver `docs/contrato_features.md`).
 - La **proyección punteada** se dibuja pegada a la superficie y gira con la esfera.
 - Usa **sus propios modelos**, entrenados con un dataset 3D sintético hecho a partir del 2D (ver «Modo 3D» más abajo).
@@ -148,9 +148,11 @@ python training/build_sequences_3d.py          # pega cada muestra 2D sobre la e
 python training/entrenar_hmms.py --modo 3d     # entrena los 27 modelos 3D -> data/modelos_letras_3d.json
 ```
 
-Cada muestra se pega varias veces sobre la cara visible de la esfera, con posición, tamaño (±30 %) y giro (±8°) al azar, enrollando el lienzo sobre la superficie con el mapa exponencial. El reparto entrenamiento/prueba es **por muestra** y se hace antes de pegarlas: ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otro lugar de la esfera.
+Cada muestra se pega varias veces sobre la esfera, derecha respecto al polo norte, en cualquier longitud (también en la cara de atrás) y a una latitud de hasta ±0.6 rad del ecuador, con tamaño (±30 %) y giro (±8°) al azar, enrollando el lienzo sobre la superficie con el mapa exponencial. El reparto entrenamiento/prueba es **por muestra** y se hace antes de pegarlas: ninguna muestra de prueba aparece en el entrenamiento, ni siquiera en otro lugar de la esfera.
 
-Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **91.6 %** solo con el HMM y **93.1 %** con el término de largo que usa la app (ver «Cómo decide la letra»). Los modelos 2D sobre esa misma prueba dan 92.4 % solo con el HMM: con el dataset de un diseño por letra ya toleran bien la curvatura. Con el dataset anterior, más chico, los modelos 3D sí ganaban (87.8 % contra 85.6 %).
+Acierto de los modelos 3D sobre la prueba 3D (996 secuencias): **88.8 %** solo con el HMM y **92.6 %** con el término de largo que usa la app (ver «Cómo decide la letra»). Los modelos 2D sobre esa misma prueba dan 90.3 % solo con el HMM: con el dataset de un diseño por letra ya toleran bien la curvatura.
+
+El acierto depende de la latitud, porque junto a los polos los meridianos se juntan y «arriba» deja de ser una sola dirección a lo ancho de la letra: se mantiene cerca de 91 % hasta 0.6 rad (34°) del ecuador, baja a 87 % a 0.9 rad (52°) y a 75 % a 1.1 rad (63°).
 
 ### La guía de dibujo
 
@@ -217,7 +219,7 @@ Glifo/
 │       ├── guide_popup.py        # Guía de letras (animada, trazos de Glifo Capture)
 │       ├── guia_trazos.py        # Lee las dos guías y las convierte en puntos
 │       ├── recognizer.py         # Puente FeatureExtractor + HMMEngine
-│       ├── recognizer_3d.py      # El mismo puente para la esfera (marco de la vista, solo lo visible)
+│       ├── recognizer_3d.py      # El mismo puente para la esfera (toda la esfera, norte en su polo)
 │       ├── widgets.py            # Componentes visuales compartidos
 │       └── theme.py              # Colores, fuentes y estilos
 ├── training/

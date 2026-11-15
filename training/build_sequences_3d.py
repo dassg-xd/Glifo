@@ -24,8 +24,12 @@ from src.FeatureExtractor import (  # noqa: E402
     pegar_en_esfera,
 )
 
-RANGO_THETA = 0.35
-RANGO_PHI = 0.30
+# Cuenta toda la esfera: la letra puede quedar en cualquier longitud θ, se vea o no. «Arriba»
+# es el polo norte, así que cada muestra se pega derecha respecto al meridiano de su centro;
+# en latitud se queda en una franja alrededor del ecuador, porque junto a los polos los
+# meridianos se juntan y «arriba» deja de ser una sola dirección a lo ancho de la letra.
+RANGO_THETA = math.pi
+RANGO_PHI = 0.60
 RANGO_ESCALA = (0.7, 1.3)
 RANGO_GIRO = math.radians(8)
 

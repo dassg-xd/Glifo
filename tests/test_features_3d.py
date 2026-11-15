@@ -13,7 +13,6 @@ from src.FeatureExtractor import (  # noqa: E402
     de_esfericas,
     mover,
     rumbo,
-    visibles,
 )
 
 CENTRO = math.pi / 2   # φ del centro de la vista
@@ -100,22 +99,35 @@ class TestRemuestreo(unittest.TestCase):
         self.assertEqual(fx.extract(pts, "3d")[:1], [0])
 
 
-class TestVisibles(unittest.TestCase):
-    def test_lo_de_atras_se_ignora(self):
-        tramos = visibles([(0, 0, 1), (0.5, 0, 0.5), (1, 0, -0.2), (0.4, 0.1, -0.9), (0.2, 0, 0.9)])
-        self.assertEqual([len(t) for t in tramos], [2, 1])
-
-    def test_trazo_partido_cuenta_como_dos(self):
-        """Si un trazo pasa por detrás, sus partes visibles se unen con un símbolo de salto."""
+class TestTodaLaEsfera(unittest.TestCase):
+    def test_lo_de_atras_tambien_cuenta(self):
+        """Un trazo en la cara de atrás (z < 0) da los mismos símbolos que el mismo trazo adelante."""
         fx = FeatureExtractor()
-        entero = arco(-0.4, CENTRO, 0.4, CENTRO)
-        partido = entero[:15] + [(0.3, 0.0, -0.9)] + entero[25:]
-        simbolos, saltos = fx.extract_trazos([partido], "3d", con_saltos=True)
-        self.assertEqual(len(saltos), 1)
+        adelante = arco(-0.4, CENTRO, 0.4, CENTRO)
+        atras = arco(math.pi - 0.4, CENTRO, math.pi + 0.4, CENTRO)
+        self.assertTrue(all(p[2] < 0 for p in atras))
+        self.assertEqual(fx.extract_trazos([atras], "3d"), fx.extract_trazos([adelante], "3d"))
+
+    def test_un_trazo_que_pasa_por_detras_es_un_solo_trazo(self):
+        fx = FeatureExtractor()
+        vuelta = arco(-0.4, CENTRO, math.pi + 0.4, CENTRO, n=200)
+        simbolos, saltos = fx.extract_trazos([vuelta], "3d", con_saltos=True)
+        self.assertEqual(saltos, [])
         self.assertTrue(all(s == 0 for s in simbolos))
 
-    def test_todo_detras_no_da_simbolos(self):
-        self.assertEqual(FeatureExtractor().extract_trazos([[(0, 0, -1), (0.1, 0, -1)]], "3d"), [])
+    def test_arriba_es_el_polo_norte(self):
+        """Subir por un meridiano es «arriba» (símbolo 2) en cualquier longitud de la esfera."""
+        fx = FeatureExtractor()
+        for theta in (0.0, 1.5, math.pi, -2.0):
+            self.assertTrue(all(s == 2 for s in fx.extract(arco(theta, 1.9, theta, 1.3), "3d")))
+
+    def test_orden_de_trazos_al_cruzar_el_meridiano_pi(self):
+        """Dos palitos a los lados de θ = ±π se ordenan de izquierda a derecha, como en θ = 0."""
+        fx = FeatureExtractor()
+        for base in (0.0, math.pi):
+            izq, der = arco(base - 0.1, 1.4, base - 0.1, 1.8), arco(base + 0.1, 1.4, base + 0.1, 1.8)
+            orden = fx.ordenar_trazos_3d([der, izq])
+            self.assertLess(angulo_entre(orden[0][0], izq[0]), 1e-9)
 
 
 class TestVariosTrazos3D(unittest.TestCase):
