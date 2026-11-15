@@ -100,8 +100,10 @@ class TestBuildSequences(unittest.TestCase):
         seqs, desc = build_sequences.to_sequences(self.datos(), self.fx, min_symbols=4)
         self.assertEqual(desc, 0)
         self.assertEqual(len(seqs["l"]), 10)
-        self.assertEqual(seqs["l"][0][0], 2)       # empieza subiendo
-        self.assertEqual(seqs["l"][0][-1], 0)      # termina a la derecha
+        d = self.fx.direccion
+        self.assertEqual(d(seqs["l"][0][0]), 2)    # empieza subiendo
+        self.assertEqual(d(seqs["l"][0][-1]), 0)   # termina a la derecha
+        self.assertEqual(self.fx.zona(seqs["l"][0][-1]), 0)   # y muy por encima de donde empezó
         self.assertEqual(seqs["a"], [])            # las 27 letras siempre aparecen
         self.assertEqual(len(seqs), 27)
 
@@ -145,12 +147,12 @@ class TestBuildSequences(unittest.TestCase):
             finally:
                 sys.argv = argv
             r = json.loads(salida.read_text(encoding="utf-8"))
-            self.assertEqual((r["modo"], r["k"], r["n_simbolos"]), ("2d", 8, 8))
+            self.assertEqual((r["modo"], r["k"], r["n_simbolos"]), ("2d", 16, 48))
             self.assertEqual(len(r["secuencias"]["l"]), 8)
             self.assertEqual(len(r["prueba"]["l"]), 2)
             self.assertEqual(set(r["secuencias"]), set(ALPHABET))
             todos = {s for letra in r["secuencias"].values() for seq in letra for s in seq}
-            self.assertTrue(todos <= set(range(8)))
+            self.assertTrue(todos <= set(range(r["n_simbolos"])))
             for clave in ("paso", "suavizado", "canvas", "holdout", "semilla"):
                 self.assertIn(clave, r)
 
@@ -172,7 +174,7 @@ class TestDatasetReal(unittest.TestCase):
             for trazos in datos[letra][:5]:
                 sec = fx.extract_trazos(trazos)
                 self.assertGreater(len(sec), 3)
-                self.assertTrue(all(0 <= s < 8 for s in sec))
+                self.assertTrue(all(0 <= s < fx.n_simbolos for s in sec))
                 self.assertTrue(all(math.isfinite(x) and math.isfinite(y) for t in trazos for x, y in t))
 
 

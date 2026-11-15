@@ -14,8 +14,8 @@ from src.HMMEngine import HMMEngine  # noqa: E402
 
 # Archivos de entrada y salida por modo. Los modelos 3D van aparte: el 2D no se toca.
 ARCHIVOS = {
-    "2d": ("secuencias_2d_k8.json", "modelos_letras_entrenados.json"),
-    "3d": ("secuencias_3d_k8.json", "modelos_letras_3d.json"),
+    "2d": ("secuencias_2d_k16.json", "modelos_letras_entrenados.json"),
+    "3d": ("secuencias_3d_k16.json", "modelos_letras_3d.json"),
 }
 
 
@@ -44,7 +44,9 @@ def main():
     #    usa el largo que alcanza el 90 % de sus secuencias (percentil 10), mínimo 3.
     ESTADOS = 8
     with open(archivo_entrada, encoding='utf-8') as f:
-        secuencias = json.load(f)['secuencias']
+        datos = json.load(f)
+    secuencias = datos['secuencias']
+    M = int(datos['n_simbolos'])        # tamaño del alfabeto: direcciones × zonas
     diccionario_estados = {
         letra: int(min(ESTADOS, max(3, np.percentile([len(O) for O in seqs], 10))))
         for letra, seqs in secuencias.items() if seqs
@@ -55,10 +57,11 @@ def main():
     
     # 4. Entrenar los modelos
     print(f"Cargando observaciones desde: {archivo_entrada}")
-    # Usamos M=8 (k8) y 15 épocas suelen ser un buen estándar para asegurar la convergencia en Baum-Welch
+    # 15 épocas suelen ser un buen estándar para asegurar la convergencia en Baum-Welch
+    print(f"Alfabeto de {M} símbolos")
     motor.entrenar_modelos(ruta_json_secuencias=archivo_entrada, 
                            estados_por_letra=diccionario_estados, 
-                           M=8, 
+                           M=M, 
                            epocas=15)
     
     # 5. Exportar las matrices entrenadas
