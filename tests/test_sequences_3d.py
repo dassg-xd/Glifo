@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "training"))
 
-from build_sequences_3d import colocacion_al_azar, repartir_muestras  # noqa: E402
+from build_sequences_3d import RANGO_PHI, colocacion_al_azar, repartir_muestras  # noqa: E402
 from src.FeatureExtractor import ANGULO_LIENZO, FeatureExtractor, angulo_entre, de_esfericas, pegar_en_esfera  # noqa: E402
 
 
@@ -33,11 +33,14 @@ class TestPegar(unittest.TestCase):
         en_esfera = pegar_en_esfera(ele(), 0.0, math.pi / 2, ANGULO_LIENZO)
         self.assertEqual(fx.extract_trazos(en_esfera, "3d"), fx.extract_trazos(ele(), "2d"))
 
-    def test_colocaciones_en_la_cara_visible(self):
+    def test_colocaciones_en_toda_la_esfera(self):
+        """Las muestras se pegan en cualquier longitud (también en la cara de atrás) y en una
+        franja de latitudes alrededor del ecuador."""
         rng = random.Random(1)
-        for _ in range(200):
-            theta, phi, _, _ = colocacion_al_azar(rng)
-            self.assertGreater(de_esfericas(theta, phi)[2], 0.0)
+        centros = [de_esfericas(*colocacion_al_azar(rng)[:2]) for _ in range(400)]
+        self.assertTrue(any(c[2] < -0.5 for c in centros))
+        self.assertTrue(any(c[2] > 0.5 for c in centros))
+        self.assertTrue(all(abs(c[1]) < math.sin(RANGO_PHI) + 1e-9 for c in centros))
 
 
 class TestReparto(unittest.TestCase):
